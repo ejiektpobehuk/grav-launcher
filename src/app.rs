@@ -1,0 +1,86 @@
+use crate::event::Event;
+use crate::ui::AppState;
+use crate::ui::draw;
+use color_eyre::Result;
+use crossterm::event as terminal_event;
+use ratatui::prelude::*;
+use std::sync::mpsc;
+
+pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) -> Result<()> {
+    let mut app_state = AppState::init();
+    loop {
+        terminal.draw(|frame| draw(frame, &mut app_state))?;
+        match rx.recv()? {
+            Event::Input(event) => {
+                if event.code == terminal_event::KeyCode::Char('q') {
+                    break;
+                }
+            }
+            Event::Resize => {
+                terminal.autoresize()?;
+            }
+            Event::Tick => {}
+            Event::AccessingOnlineHash => {
+                app_state.log.remote_hash_msg = Some("accessing".into());
+            }
+            Event::OfflineError(err) => {
+                app_state.log.remote_hash_msg =
+                    Some(format!("unavailable. No internet connection: {err}"));
+            }
+            Event::RemoteHash(hash_value) => {
+                app_state.log.remote_hash_msg = Some(hash_value);
+            }
+            Event::ComputingLocalHash => {
+                app_state.log.local_hash_msg = Some("Computing".into());
+            }
+            Event::LocalHash(hash_value) => {
+                app_state.log.local_hash_msg = Some(hash_value);
+            }
+            Event::HashAreEqual(eq) => {
+                if eq {
+                    app_state.log.push(
+                        "Hashes are the same: You have the latest verstion of the game. ".into(),
+                    );
+                } else {
+                    app_state
+                        .log
+                        .push("Hashes are different: There is a newer version.".into());
+                }
+            }
+            Event::DownloadingBinary(_) => {
+                app_state.log.push(format!(
+                    "Downloading a new binary: a file size should be here"
+                ));
+            }
+            Event::RemoteBinaryDownloaded => {
+                app_state.log.push(format!(
+                    "Downloading a new binary: a file size should be here"
+                ));
+            }
+            Event::BinaryDownloadError(err) => {
+                app_state
+                    .log
+                    .push(format!("Unable to download a remote binary: {err}"));
+            }
+            Event::NoLocalBinaryFound => {
+                app_state
+                    .log
+                    .push("Local game binary not found".to_string());
+            }
+            Event::GameBinaryUpdated => {}
+            Event::Launching => {
+                app_state.log.push("Launcning the game. . .".to_string());
+            }
+            Event::GameExecutionError(err) => {
+                app_state.log.push(format!("Game execution error: {err}"));
+            }
+            Event::GameOutput(stdout) => {
+                app_state.game_stdout.push(stdout);
+            }
+            Event::GameErrorOutput(stderr) => {
+                app_state.game_stderr.push(stderr);
+            }
+        }
+    }
+    Ok(())
+}

@@ -1,7 +1,7 @@
 use color_eyre::{Result, eyre::eyre};
 use eyre::WrapErr;
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -68,7 +68,7 @@ fn launcher_logic_impl(tx: &mpsc::Sender<Event>) -> Result<()> {
                 }
             } else {
                 tx.send(Event::HashAreEqual(false)).ok();
-                match download_game_binary() {
+                match download_game_binary(remote_version_hash, tx) {
                     Ok(game_path) => {
                         tx.send(Event::RemoteBinaryDownloaded).ok();
                         if let Err(e) = run_the_game(game_path, tx) {
@@ -81,9 +81,8 @@ fn launcher_logic_impl(tx: &mpsc::Sender<Event>) -> Result<()> {
                 }
             }
         }
-        Ok(None) => match download_game_binary() {
+        Ok(None) => match download_game_binary(remote_version_hash, tx) {
             Ok(game_path) => {
-                tx.send(Event::RemoteBinaryDownloaded).ok();
                 if let Err(e) = run_the_game(game_path, tx) {
                     tx.send(Event::GameExecutionError(format!("{e}"))).ok();
                 }
@@ -98,27 +97,52 @@ fn launcher_logic_impl(tx: &mpsc::Sender<Event>) -> Result<()> {
             )))
             .ok();
         }
-    };
+    }
     Ok(())
 }
 
-fn download_game_binary() -> Result<PathBuf> {
+fn download_game_binary(current_hash: String, tx: &mpsc::Sender<Event>) -> Result<PathBuf> {
     let response = reqwest::blocking::get(BASE_URL)
         .wrap_err("Failed to download game binary (network/HTTP error)")?;
+    let total_size = response
+        .headers()
+        .get(reqwest::header::CONTENT_LENGTH)
+        .and_then(|ct_len| ct_len.to_str().ok()?.parse::<u64>().ok());
 
     let xdg_dirs =
         xdg::BaseDirectories::with_prefix("GRAV").wrap_err("Failed to get XDG data dir")?;
-    let file_path = xdg_dirs
+    let tmp_path = xdg_dirs
+        .place_data_file(current_hash)
+        .wrap_err("Can't create temporary file path")?;
+    let mut file = File::create(&tmp_path)
+        .wrap_err_with(|| format!("Failed to create file {:?}", tmp_path))?;
+    tx.send(Event::StartDownloadingBinary(total_size)).ok();
+
+    let mut downloaded: u64 = 0;
+    let mut resp = response;
+    let mut buffer = [0u8; 8 * 1024];
+
+    loop {
+        let bytes_read = resp
+            .read(&mut buffer)
+            .wrap_err("Failed to read from HTTP stream")?;
+        if bytes_read == 0 {
+            break;
+        }
+        file.write_all(&buffer[..bytes_read])
+            .wrap_err("Failed to write binary file to disk")?;
+        downloaded += bytes_read as u64;
+
+        tx.send(Event::DownloadProgress(downloaded)).ok();
+    }
+    tx.send(Event::RemoteBinaryDownloaded).ok();
+    check_exec_permissions(&tmp_path)?;
+    let destination_path = xdg_dirs
         .place_data_file("GRAV.x86_64")
         .wrap_err("Can't create data file path")?;
-    let mut file = File::create(&file_path)
-        .wrap_err_with(|| format!("Failed to create file {:?}", file_path))?;
-    let response_bytes = response
-        .bytes()
-        .wrap_err("Failed to read HTTP response body as bytes")?;
-    file.write_all(&response_bytes)
-        .wrap_err("Failed to write binary file to disk")?;
-    Ok(file_path)
+    fs::copy(&tmp_path, &destination_path)?;
+    tx.send(Event::GameBinaryUpdated).ok();
+    Ok(tmp_path)
 }
 
 fn run_the_game(game_path: PathBuf, tx: &mpsc::Sender<Event>) -> Result<()> {
@@ -177,6 +201,6 @@ fn run_the_game(game_path: PathBuf, tx: &mpsc::Sender<Event>) -> Result<()> {
 fn check_exec_permissions(binary_path: &PathBuf) -> Result<()> {
     let permissions = fs::Permissions::from_mode(0o744);
     fs::set_permissions(binary_path, permissions)
-        .wrap_err_with(|| format!("Failed to set execute permissions for {:?}", binary_path))?;
+        .wrap_err_with(|| format!("Failed to set execute permissions for {binary_path:?}"))?;
     Ok(())
 }

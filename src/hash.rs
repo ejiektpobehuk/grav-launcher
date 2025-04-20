@@ -18,8 +18,13 @@ pub fn get_local_hash() -> Result<Option<(String, PathBuf)>> {
 
     if let Some(game_binary_path) = xdg_dirs.find_data_file("GRAV.x86_64") {
         // Open the file in read-only mode
-        let file = File::open(&game_binary_path)
-            .map_err(|e| eyre!("Failed to open game binary at {:?}: {}", game_binary_path, e))?;
+        let file = File::open(&game_binary_path).map_err(|e| {
+            eyre!(
+                "Failed to open game binary at {:?}: {}",
+                game_binary_path,
+                e
+            )
+        })?;
         let mut reader = BufReader::new(file);
 
         // Create a Sha256 object
@@ -28,7 +33,8 @@ pub fn get_local_hash() -> Result<Option<(String, PathBuf)>> {
         // Read the file in chunks
         let mut buffer = [0; 1024];
         loop {
-            let bytes_read = reader.read(&mut buffer)
+            let bytes_read = reader
+                .read(&mut buffer)
                 .map_err(|e| eyre!("Failed to read from file: {}", e))?;
             if bytes_read == 0 {
                 break;

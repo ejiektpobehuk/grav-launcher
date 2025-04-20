@@ -47,20 +47,17 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
                         .push("Hashes are different: There is a newer version.".into());
                 }
             }
-            Event::DownloadingBinary(_) => {
-                app_state.log.push(format!(
-                    "Downloading a new binary: a file size should be here"
-                ));
+            Event::StartDownloadingBinary(total_download_size) => {
+                app_state.log.start_download(total_download_size);
+            }
+            Event::DownloadProgress(downloaded) => {
+                app_state.log.set_download_progress(downloaded);
             }
             Event::RemoteBinaryDownloaded => {
-                app_state.log.push(format!(
-                    "Downloading a new binary: a file size should be here"
-                ));
+                app_state.log.mark_download_complete();
             }
             Event::BinaryDownloadError(err) => {
-                app_state
-                    .log
-                    .push(format!("Unable to download a remote binary: {err}"));
+                app_state.log.set_download_error(err);
             }
             Event::NoLocalBinaryFound => {
                 app_state

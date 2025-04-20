@@ -28,7 +28,7 @@ fn main() -> Result<()> {
 
     ratatui::restore();
 
-    let res = thread_join_handle.join();
+    let _res = thread_join_handle.join();
     app_result
 }
 

@@ -1,6 +1,6 @@
 use crossterm::event as terminal_event;
 
-type FileSize = f64;
+type FileSize = u64;
 // type Percentage = f64;
 pub enum Event {
     Input(terminal_event::KeyEvent),
@@ -10,10 +10,10 @@ pub enum Event {
     OfflineError(String),
     RemoteHash(String),
     LocalHash(String),
-    // Progress(Percentage),
     ComputingLocalHash,
     HashAreEqual(bool),
-    DownloadingBinary(FileSize),
+    StartDownloadingBinary(Option<FileSize>),
+    DownloadProgress(FileSize),
     BinaryDownloadError(String),
     RemoteBinaryDownloaded,
     NoLocalBinaryFound,

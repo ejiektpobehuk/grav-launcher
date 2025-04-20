@@ -1,3 +1,6 @@
+mod log;
+use crate::ui::log::Log;
+
 use ratatui::{
     Frame,
     prelude::*,
@@ -76,7 +79,7 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
         .game_stdout
         .iter()
         .map(|i| {
-            let content = Line::from(Span::raw(format!("{i}")));
+            let content = Line::from(Span::raw(i.to_string()));
             ListItem::new(content)
         })
         .collect();
@@ -94,7 +97,7 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
         .game_stderr
         .iter()
         .map(|i| {
-            let content = Line::from(Span::raw(format!("{i}")));
+            let content = Line::from(Span::raw(i.to_string()));
             ListItem::new(content)
         })
         .collect();
@@ -107,40 +110,4 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
     let stderr = List::new(stderrs).block(block);
 
     frame.render_stateful_widget(stderr, game_output_layout[1], &mut app_state.stderr_state);
-}
-
-pub struct Log {
-    pub local_hash_msg: Option<String>,
-    pub remote_hash_msg: Option<String>,
-    pub download_msg: Option<String>,
-    pub extra_log: Vec<String>,
-}
-
-impl Log {
-    const fn new() -> Self {
-        Self {
-            local_hash_msg: None,
-            remote_hash_msg: None,
-            download_msg: None,
-            extra_log: Vec::new(),
-        }
-    }
-    pub fn push(&mut self, string: String) {
-        self.extra_log.push(string);
-    }
-    fn entries(&self) -> Vec<String> {
-        let mut accumulator: Vec<String> = Vec::new();
-        if let Some(remote_hash) = &self.remote_hash_msg {
-            accumulator.push(format!("Remote hash: {remote_hash}"));
-        }
-        if let Some(local_hash) = &self.local_hash_msg {
-            accumulator.push(format!("Local hash:  {local_hash}"));
-        }
-        if let Some(download) = &self.download_msg {
-            accumulator.push(download.to_string());
-        }
-        let mut extra_log_clone = self.extra_log.clone();
-        accumulator.append(&mut extra_log_clone);
-        accumulator
-    }
 }

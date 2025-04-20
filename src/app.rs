@@ -80,6 +80,9 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
             Event::GameErrorOutput(stderr) => {
                 app_state.game_stderr.push(stderr);
             }
+            Event::LauncherError(err) => {
+                app_state.log.push(format!("Error: {err}"));
+            }
         }
     }
     Ok(())

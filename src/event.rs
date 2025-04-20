@@ -22,4 +22,5 @@ pub enum Event {
     Launching,
     GameOutput(String),
     GameErrorOutput(String),
+    LauncherError(String),
 }

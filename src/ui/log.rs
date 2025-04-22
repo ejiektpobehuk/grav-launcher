@@ -17,32 +17,22 @@ impl Log {
     pub fn push(&mut self, string: String) {
         self.extra_log.push(string);
     }
-    pub fn entries(&self) -> Vec<String> {
-        let mut accumulator: Vec<String> = Vec::new();
+    pub fn entries(&self) -> Vec<Entry> {
+        let mut accumulator: Vec<Entry> = Vec::new();
         if let Some(remote_hash) = &self.remote_hash_msg {
-            accumulator.push(format!("Remote hash: {remote_hash}"));
+            accumulator.push(format!("Remote hash: {remote_hash}").into());
         }
         if let Some(local_hash) = &self.local_hash_msg {
-            accumulator.push(format!("Local hash:  {local_hash}"));
+            accumulator.push(format!("Local hash:  {local_hash}").into());
         }
         match &self.download.status {
             DownloadStatus::NotStarted => {}
-            DownloadStatus::InProgress => {
-                if let Some(total) = self.download.total {
-                    accumulator.push(format!("Downloading: {0}/{total}", self.download.current));
-                } else {
-                    accumulator.push(format!("Downloading: {0}", self.download.current));
-                }
-            }
-            DownloadStatus::Comple => {
-                accumulator.push(format!("Download complete: {0}", self.download.current));
-            }
-            DownloadStatus::Errored(err) => {
-                accumulator.push(format!("Download error: {err}"));
+            _ => {
+                accumulator.push(self.download.clone().into());
             }
         }
-        let mut extra_log_clone = self.extra_log.clone();
-        accumulator.append(&mut extra_log_clone);
+        let extra_log_clone = self.extra_log.clone();
+        accumulator.append(&mut extra_log_clone.iter().map(|e| e.into()).collect());
         accumulator
     }
     pub fn start_download(&mut self, total: Option<u64>) {
@@ -60,13 +50,36 @@ impl Log {
     }
 }
 
-struct Download {
+pub enum Entry {
+    Text(String),
+    Downloand(Download),
+}
+
+impl From<String> for Entry {
+    fn from(text: String) -> Self {
+        Self::Text(text)
+    }
+}
+impl From<&String> for Entry {
+    fn from(text: &String) -> Self {
+        Self::Text(text.clone())
+    }
+}
+impl From<Download> for Entry {
+    fn from(download: Download) -> Self {
+        Self::Downloand(download)
+    }
+}
+
+#[derive(Clone)]
+pub struct Download {
     total: Option<u64>,
     current: u64,
     status: DownloadStatus,
 }
 
-enum DownloadStatus {
+#[derive(Clone)]
+pub enum DownloadStatus {
     NotStarted,
     InProgress,
     Comple,
@@ -80,5 +93,15 @@ impl Download {
             current: 0,
             status: DownloadStatus::NotStarted,
         }
+    }
+
+    pub fn current(&self) -> u64 {
+        self.current
+    }
+    pub fn status(&self) -> &DownloadStatus {
+        &self.status
+    }
+    pub fn total(&self) -> &Option<u64> {
+        &self.total
     }
 }

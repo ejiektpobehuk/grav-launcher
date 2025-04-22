@@ -1,6 +1,9 @@
 mod log;
-use crate::ui::log::Log;
+use crate::ui::log::{Entry, Log};
+mod list;
+use crate::ui::list::ListItem as WListItem;
 
+use log::DownloadStatus;
 use ratatui::{
     Frame,
     prelude::*,
@@ -9,12 +12,13 @@ use ratatui::{
     text::Line,
     widgets::{Block, List, ListItem, ListState},
 };
+use tui_widget_list::{ListBuilder, ListState as WListState, ListView};
 
 pub struct AppState {
     pub log: Log,
     pub game_stdout: Vec<String>,
     pub game_stderr: Vec<String>,
-    pub list_state: ListState,
+    pub list_state: WListState,
     pub stdout_state: ListState,
     pub stderr_state: ListState,
 }
@@ -25,7 +29,7 @@ impl AppState {
             log: Log::new(),
             game_stdout: Vec::new(),
             game_stderr: Vec::new(),
-            list_state: ListState::default(),
+            list_state: WListState::default(),
             stdout_state: ListState::default(),
             stderr_state: ListState::default(),
         }
@@ -56,22 +60,59 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
         .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(inner_layout[1]);
 
-    let items: Vec<ListItem> = app_state
+    let items: Vec<WListItem> = app_state
         .log
         .entries()
         .iter()
-        .map(|i| {
-            let content = Line::from(Span::raw(i).to_string());
-            ListItem::new(content)
+        .map(|i| match i {
+            Entry::Text(text) => {
+                WListItem::new(text)
+            }
+            Entry::Downloand(download) => match download.status() {
+                DownloadStatus::InProgress => {
+                    if let Some(total) = download.total() {
+                        WListItem::new_gauge(
+                            "Downloading: ",
+                            (download.current() as f64) / (total.clone() as f64),
+                        )
+                    } else {
+                        WListItem::new(format!(
+                            "Downloading: {}",
+                            download.current()
+                        ))
+                    }
+                }
+                DownloadStatus::Comple => {
+                    WListItem::new(Line::from(Span::raw(format!(
+                        "Downloaded: {} bytes",
+                        download.current()
+                    ))))
+                }
+                DownloadStatus::Errored(err) => {
+                    WListItem::new(format!("Download error: {err}"))
+                }
+                DownloadStatus::NotStarted => WListItem::new(
+                    "Download oopsie: something strange happened",
+                ),
+            },
         })
         .collect();
+
+    let builder = ListBuilder::new(|context| {
+        let item = items[context.index].clone();
+
+        // Return the size of the widget along the main axis.
+        let main_axis_size = 1;
+
+        (item, main_axis_size)
+    });
 
     let title = Line::from(" Launcher log ".bold());
     let block = Block::bordered()
         .title(title.centered())
         .border_set(border::THICK);
 
-    let list = List::new(items).block(block);
+    let list = ListView::new(builder, items.len()).block(block);
 
     frame.render_stateful_widget(list, inner_layout[0], &mut app_state.list_state);
 

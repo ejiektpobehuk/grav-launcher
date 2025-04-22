@@ -38,6 +38,7 @@
 - [ ] поддержка контроллера для навигации по логам и выхода
 - [ ] навигация по логам
 - [ ] обновление самого launcher'а из launcher'a
+- [ ] graceful shutdown
 
 ### NixOS build fixes
 
@@ -46,5 +47,3 @@ Patch NixOS Rust binary to work on SteamOS
 ```sh
 nix shell nixpkgs#patchelf --command patchelf --set-interpreter /usr/lib64/ld-linux-x86-64.so.2 target/release/grav-launcher
 ```
-
-

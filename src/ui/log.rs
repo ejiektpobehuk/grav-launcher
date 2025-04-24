@@ -32,7 +32,12 @@ impl Log {
             }
         }
         let extra_log_clone = self.extra_log.clone();
-        accumulator.append(&mut extra_log_clone.iter().map(std::convert::Into::into).collect());
+        accumulator.append(
+            &mut extra_log_clone
+                .iter()
+                .map(std::convert::Into::into)
+                .collect(),
+        );
         accumulator
     }
     pub fn start_download(&mut self, total: Option<u64>) {

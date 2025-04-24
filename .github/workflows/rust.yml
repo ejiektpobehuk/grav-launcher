@@ -36,4 +36,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: grav-launcher
-        path: target/release/grav-launcher
+        path: target/debug/grav-launcher

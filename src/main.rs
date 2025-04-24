@@ -1,16 +1,14 @@
-use std::io::{self, Write};
+use std::io;
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
 use color_eyre::Result;
-use gilrs::{Button, Event as GilrsEvent, EventType, Gilrs};
+use gilrs::{EventType, Gilrs};
 
 use crossterm::event as terminal_event;
-use crossterm::event::{Event as CrosstermEvent, EventStream};
+use crossterm::event::Event as CrosstermEvent;
 use crossterm::execute;
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-use futures::StreamExt;
 
 mod event;
 use crate::event::Event;
@@ -72,10 +70,10 @@ fn input_handling(tx: mpsc::Sender<Event>) {
                     CrosstermEvent::Key(key) => tx.send(Event::Input(key)).unwrap(),
                     CrosstermEvent::Resize(_, _) => tx.send(Event::Resize).unwrap(),
                     CrosstermEvent::FocusGained => {
-                        tx.send(Event::TerminalFocusChanged(true)).unwrap()
+                        tx.send(Event::TerminalFocusChanged(true)).unwrap();
                     }
                     CrosstermEvent::FocusLost => {
-                        tx.send(Event::TerminalFocusChanged(false)).unwrap()
+                        tx.send(Event::TerminalFocusChanged(false)).unwrap();
                     }
                     _ => {}
                 }
@@ -93,7 +91,7 @@ fn controller_input_handling(tx: mpsc::Sender<Event>) {
         let mut gilrs = match Gilrs::new() {
             Ok(gilrs) => gilrs,
             Err(e) => {
-                eprintln!("Failed to initialize gilrs: {}", e);
+                eprintln!("Failed to initialize gilrs: {e}");
                 return;
             }
         };

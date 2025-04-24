@@ -32,21 +32,21 @@ impl Log {
             }
         }
         let extra_log_clone = self.extra_log.clone();
-        accumulator.append(&mut extra_log_clone.iter().map(|e| e.into()).collect());
+        accumulator.append(&mut extra_log_clone.iter().map(std::convert::Into::into).collect());
         accumulator
     }
     pub fn start_download(&mut self, total: Option<u64>) {
         self.download.status = DownloadStatus::InProgress;
         self.download.total = total;
     }
-    pub fn set_download_progress(&mut self, downloaded: u64) {
+    pub const fn set_download_progress(&mut self, downloaded: u64) {
         self.download.current = downloaded;
     }
     pub fn mark_download_complete(&mut self) {
         self.download.status = DownloadStatus::Comple;
     }
     pub fn set_download_error(&mut self, error: String) {
-        self.download.status = DownloadStatus::Errored(error)
+        self.download.status = DownloadStatus::Errored(error);
     }
 }
 
@@ -95,13 +95,13 @@ impl Download {
         }
     }
 
-    pub fn current(&self) -> u64 {
+    pub const fn current(&self) -> u64 {
         self.current
     }
-    pub fn status(&self) -> &DownloadStatus {
+    pub const fn status(&self) -> &DownloadStatus {
         &self.status
     }
-    pub fn total(&self) -> &Option<u64> {
+    pub const fn total(&self) -> &Option<u64> {
         &self.total
     }
 }

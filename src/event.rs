@@ -6,10 +6,6 @@ type FileSize = u64;
 pub enum Event {
     Input(terminal_event::KeyEvent),
     ControllerInput(Button),
-    NextLog,
-    PrevLog,
-    EnterFullscreen,
-    ExitFullscreen,
     TerminalFocusChanged(bool),
     Tick,
     Resize,

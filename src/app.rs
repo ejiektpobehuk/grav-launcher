@@ -2,7 +2,6 @@ use crate::event::Event;
 use crate::ui::AppState;
 use crate::ui::draw;
 use color_eyre::Result;
-use crossterm::event as terminal_event;
 use crossterm::event::KeyCode;
 use gilrs::Button;
 use ratatui::prelude::*;
@@ -23,7 +22,7 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
                             break;
                         }
                         // Cancel exit
-                        KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('q') => {
+                        KeyCode::Esc | KeyCode::Char('n' | 'q') => {
                             app_state.hide_exit_popup();
                         }
                         _ => {}
@@ -31,7 +30,7 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
                 } else if app_state.fullscreen_mode {
                     // In fullscreen mode, Escape/h/q return to normal view
                     match event.code {
-                        KeyCode::Esc | KeyCode::Char('h') | KeyCode::Char('q') => {
+                        KeyCode::Esc | KeyCode::Char('h' | 'q') => {
                             app_state.exit_fullscreen();
                         }
                         _ => {}
@@ -101,18 +100,6 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
                         }
                     }
                 }
-            }
-            Event::NextLog => {
-                app_state.next_log();
-            }
-            Event::PrevLog => {
-                app_state.prev_log();
-            }
-            Event::EnterFullscreen => {
-                app_state.enter_fullscreen();
-            }
-            Event::ExitFullscreen => {
-                app_state.exit_fullscreen();
             }
             Event::TerminalFocusChanged(focused) => {
                 app_state.set_terminal_focus(focused);

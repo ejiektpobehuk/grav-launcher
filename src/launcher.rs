@@ -115,7 +115,7 @@ fn download_game_binary(current_hash: String, tx: &mpsc::Sender<Event>) -> Resul
         .place_data_file(current_hash)
         .wrap_err("Can't create temporary file path")?;
     let mut file = File::create(&tmp_path)
-        .wrap_err_with(|| format!("Failed to create file {:?}", tmp_path))?;
+        .wrap_err_with(|| format!("Failed to create file {tmp_path:?}"))?;
     tx.send(Event::StartDownloadingBinary(total_size)).ok();
 
     let mut downloaded: u64 = 0;

@@ -50,7 +50,7 @@ impl AppState {
         }
     }
 
-    pub fn next_log(&mut self) {
+    pub const fn next_log(&mut self) {
         self.focused_log = match self.focused_log {
             FocusedLog::LauncherLog => FocusedLog::GameStdout,
             FocusedLog::GameStdout => FocusedLog::GameStderr,
@@ -58,7 +58,7 @@ impl AppState {
         };
     }
 
-    pub fn prev_log(&mut self) {
+    pub const fn prev_log(&mut self) {
         self.focused_log = match self.focused_log {
             FocusedLog::LauncherLog => FocusedLog::GameStderr,
             FocusedLog::GameStdout => FocusedLog::LauncherLog,
@@ -66,27 +66,23 @@ impl AppState {
         };
     }
 
-    pub fn toggle_fullscreen(&mut self) {
-        self.fullscreen_mode = !self.fullscreen_mode;
-    }
-
-    pub fn enter_fullscreen(&mut self) {
+    pub const fn enter_fullscreen(&mut self) {
         self.fullscreen_mode = true;
     }
 
-    pub fn exit_fullscreen(&mut self) {
+    pub const fn exit_fullscreen(&mut self) {
         self.fullscreen_mode = false;
     }
 
-    pub fn show_exit_popup(&mut self) {
+    pub const fn show_exit_popup(&mut self) {
         self.show_exit_popup = true;
     }
 
-    pub fn hide_exit_popup(&mut self) {
+    pub const fn hide_exit_popup(&mut self) {
         self.show_exit_popup = false;
     }
 
-    pub fn set_terminal_focus(&mut self, focused: bool) {
+    pub const fn set_terminal_focus(&mut self, focused: bool) {
         if self.terminal_focused != focused {
             self.terminal_focused = focused;
         }
@@ -101,13 +97,7 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
         // Hide normal controls when popup is shown
         vec![]
     } else if app_state.fullscreen_mode {
-        if !app_state.terminal_focused {
-            vec![
-                Span::raw(" Terminal "),
-                Span::styled("NOT FOCUSED", Style::default().fg(Color::Red).bold()),
-                Span::raw(" - Controller disabled "),
-            ]
-        } else {
+        if app_state.terminal_focused {
             vec![
                 Span::raw(" Press "),
                 Span::styled("B", Style::default().fg(Color::Red).bold()),
@@ -117,30 +107,34 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
                 Span::styled("h", Style::default().fg(Color::Blue).bold()),
                 Span::raw(" to return to normal view "),
             ]
-        }
-    } else {
-        if !app_state.terminal_focused {
+        } else {
             vec![
                 Span::raw(" Terminal "),
                 Span::styled("NOT FOCUSED", Style::default().fg(Color::Red).bold()),
                 Span::raw(" - Controller disabled "),
             ]
-        } else {
-            vec![
-                Span::styled(" A", Style::default().fg(Color::Green).bold()),
-                Span::raw("/"),
-                Span::styled("Enter", Style::default().fg(Color::Blue).bold()),
-                Span::raw(" Fullscreen | "),
-                Span::styled("B", Style::default().fg(Color::Red).bold()),
-                Span::raw("/"),
-                Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
-                Span::raw(" Exit | "),
-                Span::styled("D-Pad", Style::default().fg(Color::Yellow).bold()),
-                Span::raw("/"),
-                Span::styled("Arrows", Style::default().fg(Color::Blue).bold()),
-                Span::raw(" Navigate "),
-            ]
         }
+    } else if !app_state.terminal_focused {
+        vec![
+            Span::raw(" Terminal "),
+            Span::styled("NOT FOCUSED", Style::default().fg(Color::Red).bold()),
+            Span::raw(" - Controller disabled "),
+        ]
+    } else {
+        vec![
+            Span::styled(" A", Style::default().fg(Color::Green).bold()),
+            Span::raw("/"),
+            Span::styled("Enter", Style::default().fg(Color::Blue).bold()),
+            Span::raw(" Fullscreen | "),
+            Span::styled("B", Style::default().fg(Color::Red).bold()),
+            Span::raw("/"),
+            Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
+            Span::raw(" Exit | "),
+            Span::styled("D-Pad", Style::default().fg(Color::Yellow).bold()),
+            Span::raw("/"),
+            Span::styled("Arrows", Style::default().fg(Color::Blue).bold()),
+            Span::raw(" Navigate "),
+        ]
     };
 
     let help_line = Line::from(help_text);
@@ -177,7 +171,7 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
                                 if let Some(total) = download.total() {
                                     WListItem::new_gauge(
                                         "Downloading: ",
-                                        (download.current() as f64) / (total.clone() as f64),
+                                        (download.current() as f64) / (*total as f64),
                                     )
                                 } else {
                                     WListItem::new(format!("Downloading: {}", download.current()))
@@ -274,7 +268,7 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
                         if let Some(total) = download.total() {
                             WListItem::new_gauge(
                                 "Downloading: ",
-                                (download.current() as f64) / (total.clone() as f64),
+                                (download.current() as f64) / (*total as f64),
                             )
                         } else {
                             WListItem::new(format!("Downloading: {}", download.current()))

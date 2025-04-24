@@ -49,7 +49,7 @@ impl Widget for ListItem {
                     .ratio(ratio)
                     .render(line_layout[1], buf);
             }
-        };
+        }
     }
 }
 
@@ -60,7 +60,7 @@ pub struct App {
 impl Widget for &mut App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let builder = ListBuilder::new(|context| {
-            let mut item = ListItem::new(&format!("Item {:0}", context.index));
+            let mut item = ListItem::new(format!("Item {:0}", context.index));
 
             // Alternating styles
             if context.index % 2 == 0 {
@@ -74,7 +74,7 @@ impl Widget for &mut App {
                 item.style = Style::default()
                     .bg(Color::Rgb(255, 153, 0))
                     .fg(Color::Rgb(28, 28, 32));
-            };
+            }
 
             // Return the size of the widget along the main axis.
             let main_axis_size = 1;

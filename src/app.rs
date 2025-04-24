@@ -14,7 +14,20 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
         terminal.draw(|frame| draw(frame, &mut app_state))?;
         match rx.recv()? {
             Event::Input(event) => {
-                if app_state.fullscreen_mode {
+                if app_state.show_exit_popup {
+                    // Handle input while exit popup is active
+                    match event.code {
+                        // Confirm exit
+                        KeyCode::Enter | KeyCode::Char('y') => {
+                            break;
+                        }
+                        // Cancel exit
+                        KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('q') => {
+                            app_state.hide_exit_popup();
+                        }
+                        _ => {}
+                    }
+                } else if app_state.fullscreen_mode {
                     // In fullscreen mode, Escape/h/q return to normal view
                     match event.code {
                         KeyCode::Esc | KeyCode::Char('h') | KeyCode::Char('q') => {
@@ -25,9 +38,9 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
                 } else {
                     // In normal mode
                     match event.code {
-                        // Exit application with Escape/q
+                        // Show exit confirmation popup
                         KeyCode::Char('q') | KeyCode::Esc => {
-                            break;
+                            app_state.show_exit_popup();
                         }
                         // Enter fullscreen with Enter/l
                         KeyCode::Enter | KeyCode::Char('l') => {
@@ -45,23 +58,43 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
                 }
             }
             Event::ControllerInput(button) => {
-                if app_state.fullscreen_mode {
+                if app_state.show_exit_popup {
+                    // Handle controller input while exit popup is active
+                    match button {
+                        // Confirm exit with A button
+                        Button::South => {
+                            break;
+                        }
+                        // Cancel exit with B button
+                        Button::East => {
+                            app_state.hide_exit_popup();
+                        }
+                        _ => {}
+                    }
+                } else if app_state.fullscreen_mode {
                     // In fullscreen mode, East (B) returns to normal view
                     if button == Button::East {
                         app_state.exit_fullscreen();
                     }
                 } else {
                     // In normal mode
-                    if button == Button::East {
-                        // Exit application with East (B) button when not in fullscreen
-                        break;
-                    } else if button == Button::South {
+                    match button {
+                        // Show exit confirmation with East (B) button
+                        Button::East => {
+                            app_state.show_exit_popup();
+                        }
                         // Enter fullscreen with South (A) button
-                        app_state.enter_fullscreen();
-                    } else if button == Button::DPadRight || button == Button::DPadDown {
-                        app_state.next_log();
-                    } else if button == Button::DPadLeft || button == Button::DPadUp {
-                        app_state.prev_log();
+                        Button::South => {
+                            app_state.enter_fullscreen();
+                        }
+                        // D-pad navigation
+                        _ if button == Button::DPadRight || button == Button::DPadDown => {
+                            app_state.next_log();
+                        }
+                        _ if button == Button::DPadLeft || button == Button::DPadUp => {
+                            app_state.prev_log();
+                        }
+                        _ => {}
                     }
                 }
             }

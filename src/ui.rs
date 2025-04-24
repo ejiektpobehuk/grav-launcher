@@ -10,7 +10,7 @@ use ratatui::{
     style::{Color, Style, Stylize},
     symbols::border,
     text::Line,
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear, List, ListItem, ListState, Paragraph},
 };
 use tui_widget_list::{ListBuilder, ListState as WListState, ListView};
 
@@ -30,6 +30,7 @@ pub struct AppState {
     pub stderr_state: ListState,
     pub focused_log: FocusedLog,
     pub fullscreen_mode: bool,
+    pub show_exit_popup: bool,
 }
 
 impl AppState {
@@ -43,9 +44,10 @@ impl AppState {
             stderr_state: ListState::default(),
             focused_log: FocusedLog::LauncherLog,
             fullscreen_mode: false,
+            show_exit_popup: false,
         }
     }
-    
+
     pub fn next_log(&mut self) {
         self.focused_log = match self.focused_log {
             FocusedLog::LauncherLog => FocusedLog::GameStdout,
@@ -53,7 +55,7 @@ impl AppState {
             FocusedLog::GameStderr => FocusedLog::LauncherLog,
         };
     }
-    
+
     pub fn prev_log(&mut self) {
         self.focused_log = match self.focused_log {
             FocusedLog::LauncherLog => FocusedLog::GameStderr,
@@ -61,17 +63,25 @@ impl AppState {
             FocusedLog::GameStderr => FocusedLog::GameStdout,
         };
     }
-    
+
     pub fn toggle_fullscreen(&mut self) {
         self.fullscreen_mode = !self.fullscreen_mode;
     }
-    
+
     pub fn enter_fullscreen(&mut self) {
         self.fullscreen_mode = true;
     }
-    
+
     pub fn exit_fullscreen(&mut self) {
         self.fullscreen_mode = false;
+    }
+
+    pub fn show_exit_popup(&mut self) {
+        self.show_exit_popup = true;
+    }
+
+    pub fn hide_exit_popup(&mut self) {
+        self.show_exit_popup = false;
     }
 }
 
@@ -79,7 +89,10 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
     let area = frame.area();
 
     // Create help text for controls
-    let help_text = if app_state.fullscreen_mode {
+    let help_text = if app_state.show_exit_popup {
+        // Hide normal controls when popup is shown
+        vec![]
+    } else if app_state.fullscreen_mode {
         vec![
             Span::raw(" Press "),
             Span::styled("B", Style::default().fg(Color::Red).bold()),
@@ -91,7 +104,7 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
         ]
     } else {
         vec![
-            Span::styled("A", Style::default().fg(Color::Green).bold()),
+            Span::styled(" A", Style::default().fg(Color::Green).bold()),
             Span::raw("/"),
             Span::styled("Enter", Style::default().fg(Color::Blue).bold()),
             Span::raw(" Fullscreen | "),
@@ -109,9 +122,9 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
             Span::raw(" Navigate "),
         ]
     };
-    
+
     let help_line = Line::from(help_text);
-    
+
     // Main layout that uses the full area
     let outer_layout = Layout::default()
         .constraints([Constraint::Percentage(100)].as_ref())
@@ -130,7 +143,7 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
             .margin(2)
             .constraints([Constraint::Percentage(100)].as_ref())
             .split(outer_layout[0])[0];
-        
+
         match app_state.focused_log {
             FocusedLog::LauncherLog => {
                 let items: Vec<WListItem> = app_state
@@ -150,11 +163,12 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
                                     WListItem::new(format!("Downloading: {}", download.current()))
                                 }
                             }
-                            DownloadStatus::Comple => WListItem::new(Line::from(Span::raw(format!(
-                                "Downloaded: {} bytes",
-                                download.current()
-                            )))),
-                            DownloadStatus::Errored(err) => WListItem::new(format!("Download error: {err}")),
+                            DownloadStatus::Comple => WListItem::new(Line::from(Span::raw(
+                                format!("Downloaded: {} bytes", download.current()),
+                            ))),
+                            DownloadStatus::Errored(err) => {
+                                WListItem::new(format!("Download error: {err}"))
+                            }
                             DownloadStatus::NotStarted => {
                                 WListItem::new("Download oopsie: something strange happened")
                             }
@@ -250,7 +264,9 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
                         "Downloaded: {} bytes",
                         download.current()
                     )))),
-                    DownloadStatus::Errored(err) => WListItem::new(format!("Download error: {err}")),
+                    DownloadStatus::Errored(err) => {
+                        WListItem::new(format!("Download error: {err}"))
+                    }
                     DownloadStatus::NotStarted => {
                         WListItem::new("Download oopsie: something strange happened")
                     }
@@ -336,4 +352,66 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
 
         frame.render_stateful_widget(stderr, game_output_layout[1], &mut app_state.stderr_state);
     }
+
+    // Render exit confirmation popup if needed
+    if app_state.show_exit_popup {
+        let popup_area = centered_rect(46, 12, area);
+
+        // Create a popup with text and border
+        let popup_block = Block::default()
+            .title(" Exit Confirmation ".bold())
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow))
+            .border_type(BorderType::Rounded);
+
+        // Controls text to display in the popup
+        let controls_text = vec![
+            Span::styled("A", Style::default().fg(Color::Green).bold()),
+            Span::raw("/"),
+            Span::styled("Enter", Style::default().fg(Color::Blue).bold()),
+            Span::raw("/"),
+            Span::styled("y", Style::default().fg(Color::Blue).bold()),
+            Span::raw(" - Yes    "),
+            Span::styled("B", Style::default().fg(Color::Red).bold()),
+            Span::raw("/"),
+            Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
+            Span::raw("/"),
+            Span::styled("n", Style::default().fg(Color::Blue).bold()),
+            Span::raw(" - No"),
+        ];
+
+        let popup_text = Paragraph::new(vec![
+            Line::from("Are you sure you want to exit?"),
+            Line::from(""),
+            Line::from(controls_text),
+        ])
+        .block(popup_block)
+        .alignment(Alignment::Center)
+        .style(Style::default());
+
+        // Render the popup
+        frame.render_widget(Clear, popup_area);
+        frame.render_widget(popup_text, popup_area);
+    }
+}
+
+// Helper function to create a centered rectangle of the given size
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(r);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(popup_layout[1])[1]
 }

@@ -3,6 +3,7 @@ use crate::ui::AppState;
 use crate::ui::draw;
 use color_eyre::Result;
 use crossterm::event as terminal_event;
+use crossterm::event::KeyCode;
 use gilrs::Button;
 use ratatui::prelude::*;
 use std::sync::mpsc;
@@ -13,8 +14,34 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
         terminal.draw(|frame| draw(frame, &mut app_state))?;
         match rx.recv()? {
             Event::Input(event) => {
-                if event.code == terminal_event::KeyCode::Char('q') {
-                    break;
+                if app_state.fullscreen_mode {
+                    // In fullscreen mode, Escape/h/q return to normal view
+                    match event.code {
+                        KeyCode::Esc | KeyCode::Char('h') | KeyCode::Char('q') => {
+                            app_state.exit_fullscreen();
+                        }
+                        _ => {}
+                    }
+                } else {
+                    // In normal mode
+                    match event.code {
+                        // Exit application with Escape/q
+                        KeyCode::Char('q') | KeyCode::Esc => {
+                            break;
+                        }
+                        // Enter fullscreen with Enter/l
+                        KeyCode::Enter | KeyCode::Char('l') => {
+                            app_state.enter_fullscreen();
+                        }
+                        // Navigation with arrow keys and j/k
+                        KeyCode::Right | KeyCode::Down | KeyCode::Char('j') => {
+                            app_state.next_log();
+                        }
+                        KeyCode::Left | KeyCode::Up | KeyCode::Char('k') => {
+                            app_state.prev_log();
+                        }
+                        _ => {}
+                    }
                 }
             }
             Event::ControllerInput(button) => {

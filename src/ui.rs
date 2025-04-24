@@ -83,16 +83,30 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
         vec![
             Span::raw(" Press "),
             Span::styled("B", Style::default().fg(Color::Red).bold()),
+            Span::raw("/"),
+            Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
+            Span::raw("/"),
+            Span::styled("h", Style::default().fg(Color::Blue).bold()),
             Span::raw(" to return to normal view "),
         ]
     } else {
         vec![
-            Span::styled(" A", Style::default().fg(Color::Green).bold()),
+            Span::styled("A", Style::default().fg(Color::Green).bold()),
+            Span::raw("/"),
+            Span::styled("Enter", Style::default().fg(Color::Blue).bold()),
             Span::raw(" Fullscreen | "),
             Span::styled("B", Style::default().fg(Color::Red).bold()),
+            Span::raw("/"),
+            Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
             Span::raw(" Exit | "),
             Span::styled("D-Pad", Style::default().fg(Color::Yellow).bold()),
-            Span::raw(" Navigate logs "),
+            Span::raw("/"),
+            Span::styled("Arrows", Style::default().fg(Color::Blue).bold()),
+            Span::raw("/"),
+            Span::styled("j", Style::default().fg(Color::Blue).bold()),
+            Span::raw(","),
+            Span::styled("k", Style::default().fg(Color::Blue).bold()),
+            Span::raw(" Navigate "),
         ]
     };
     

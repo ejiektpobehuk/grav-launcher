@@ -65,21 +65,43 @@ fn input_handling(tx: mpsc::Sender<Event>) {
         loop {
             // poll for tick rate duration, if no events, sent tick event.
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
-            if terminal_event::poll(timeout).unwrap() {
-                match terminal_event::read().unwrap() {
-                    CrosstermEvent::Key(key) => tx.send(Event::Input(key)).unwrap(),
-                    CrosstermEvent::Resize(_, _) => tx.send(Event::Resize).unwrap(),
-                    CrosstermEvent::FocusGained => {
-                        tx.send(Event::TerminalFocusChanged(true)).unwrap();
+            if let Ok(poll_ready) = terminal_event::poll(timeout) {
+                if poll_ready {
+                    match terminal_event::read() {
+                        Ok(event) => {
+                            let send_result = match event {
+                                CrosstermEvent::Key(key) => tx.send(Event::Input(key)),
+                                CrosstermEvent::Resize(_, _) => tx.send(Event::Resize),
+                                CrosstermEvent::FocusGained => {
+                                    tx.send(Event::TerminalFocusChanged(true))
+                                }
+                                CrosstermEvent::FocusLost => {
+                                    tx.send(Event::TerminalFocusChanged(false))
+                                }
+                                _ => Ok(()),
+                            };
+
+                            if send_result.is_err() {
+                                eprintln!(
+                                    "Terminal event receiver disconnected, shutting down input thread"
+                                );
+                                return;
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Error reading terminal event: {e}");
+                        }
                     }
-                    CrosstermEvent::FocusLost => {
-                        tx.send(Event::TerminalFocusChanged(false)).unwrap();
-                    }
-                    _ => {}
                 }
+            } else {
+                eprintln!("Error polling terminal events");
             }
+
             if last_tick.elapsed() >= tick_rate {
-                tx.send(Event::Tick).unwrap();
+                if tx.send(Event::Tick).is_err() {
+                    eprintln!("Tick event receiver disconnected, shutting down input thread");
+                    return;
+                }
                 last_tick = Instant::now();
             }
         }
@@ -100,7 +122,12 @@ fn controller_input_handling(tx: mpsc::Sender<Event>) {
             // Process controller events
             while let Some(gilrs_event) = gilrs.next_event() {
                 if let EventType::ButtonPressed(button, _) = gilrs_event.event {
-                    tx.send(Event::ControllerInput(button)).unwrap();
+                    if tx.send(Event::ControllerInput(button)).is_err() {
+                        eprintln!(
+                            "Controller event receiver disconnected, shutting down controller thread"
+                        );
+                        return;
+                    }
                 }
             }
 

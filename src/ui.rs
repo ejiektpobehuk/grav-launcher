@@ -108,8 +108,35 @@ impl AppState {
 pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
     let area = frame.area();
 
-    // Create help text for controls
-    let help_text = if app_state.show_exit_popup {
+    // Render the main UI frame with title and help text
+    render_main_frame(frame, area, app_state);
+
+    if app_state.fullscreen_mode {
+        render_fullscreen_view(frame, area, app_state);
+    } else {
+        render_normal_view(frame, area, app_state);
+    }
+
+    // Render exit confirmation popup if needed
+    if app_state.show_exit_popup {
+        render_exit_popup(frame, area, app_state);
+    }
+}
+
+fn render_main_frame(frame: &mut Frame, area: Rect, app_state: &AppState) {
+    let help_text = get_help_text(app_state);
+    let help_line = Line::from(help_text);
+
+    let title = Line::from(" GRAV launcher ".bold());
+    let block = Block::bordered()
+        .title(title.centered())
+        .title_bottom(help_line.right_aligned())
+        .border_set(border::THICK);
+    frame.render_widget(block, area);
+}
+
+fn get_help_text(app_state: &AppState) -> Vec<Span> {
+    if app_state.show_exit_popup {
         // Hide normal controls when popup is shown
         vec![]
     } else if app_state.fullscreen_mode {
@@ -160,282 +187,282 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
                 Span::raw(" Navigate "),
             ],
         }
-    };
+    }
+}
 
-    let help_line = Line::from(help_text);
-
-    // Main layout that uses the full area
+fn render_fullscreen_view(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
     let outer_layout = Layout::default()
         .constraints([Constraint::Percentage(100)].as_ref())
         .split(area);
 
-    let title = Line::from(" GRAV launcher ".bold());
+    let content_area = Layout::default()
+        .margin(2)
+        .constraints([Constraint::Percentage(100)].as_ref())
+        .split(outer_layout[0])[0];
+
+    match app_state.focused_log {
+        FocusedLog::LauncherLog => render_fullscreen_launcher_log(frame, content_area, app_state),
+        FocusedLog::GameStdout => render_fullscreen_game_stdout(frame, content_area, app_state),
+        FocusedLog::GameStderr => render_fullscreen_game_stderr(frame, content_area, app_state),
+    }
+}
+
+fn render_fullscreen_launcher_log(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
+    let items: Vec<WListItem> = app_state
+        .log
+        .entries()
+        .iter()
+        .map(|i| match i {
+            Entry::Text(text) => WListItem::new(text),
+            Entry::Downloand(download) => match download.status() {
+                DownloadStatus::InProgress => {
+                    if let Some(total) = download.total() {
+                        WListItem::new_gauge(
+                            "Downloading: ",
+                            (download.current() as f64) / (*total as f64),
+                        )
+                    } else {
+                        WListItem::new(format!("Downloading: {}", download.current()))
+                    }
+                }
+                DownloadStatus::Comple => WListItem::new(Line::from(Span::raw(format!(
+                    "Downloaded: {} bytes",
+                    download.current()
+                )))),
+                DownloadStatus::Errored(err) => WListItem::new(format!("Download error: {err}")),
+                DownloadStatus::NotStarted => {
+                    WListItem::new("Download oopsie: something strange happened")
+                }
+            },
+        })
+        .collect();
+
+    let builder = ListBuilder::new(|context| {
+        let item = items[context.index].clone();
+        let main_axis_size = 1;
+        (item, main_axis_size)
+    });
+
+    let title = Line::from(" Launcher log (FULLSCREEN) ".bold());
     let block = Block::bordered()
         .title(title.centered())
-        .title_bottom(help_line.right_aligned())
-        .border_set(border::THICK);
-    frame.render_widget(block, area);
+        .border_set(border::THICK)
+        .border_style(Style::default().fg(Color::Green));
 
-    if app_state.fullscreen_mode {
-        // Fullscreen mode - show only the focused log
-        let content_area = Layout::default()
-            .margin(2)
-            .constraints([Constraint::Percentage(100)].as_ref())
-            .split(outer_layout[0])[0];
+    let list = ListView::new(builder, items.len()).block(block);
+    frame.render_stateful_widget(list, area, &mut app_state.list_state);
+}
 
-        match app_state.focused_log {
-            FocusedLog::LauncherLog => {
-                let items: Vec<WListItem> = app_state
-                    .log
-                    .entries()
-                    .iter()
-                    .map(|i| match i {
-                        Entry::Text(text) => WListItem::new(text),
-                        Entry::Downloand(download) => match download.status() {
-                            DownloadStatus::InProgress => {
-                                if let Some(total) = download.total() {
-                                    WListItem::new_gauge(
-                                        "Downloading: ",
-                                        (download.current() as f64) / (*total as f64),
-                                    )
-                                } else {
-                                    WListItem::new(format!("Downloading: {}", download.current()))
-                                }
-                            }
-                            DownloadStatus::Comple => WListItem::new(Line::from(Span::raw(
-                                format!("Downloaded: {} bytes", download.current()),
-                            ))),
-                            DownloadStatus::Errored(err) => {
-                                WListItem::new(format!("Download error: {err}"))
-                            }
-                            DownloadStatus::NotStarted => {
-                                WListItem::new("Download oopsie: something strange happened")
-                            }
-                        },
-                    })
-                    .collect();
+fn render_fullscreen_game_stdout(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
+    let stdouts: Vec<ListItem> = app_state
+        .game_stdout
+        .iter()
+        .map(|i| {
+            let content = Line::from(Span::raw(i.to_string()));
+            ListItem::new(content)
+        })
+        .collect();
 
-                let builder = ListBuilder::new(|context| {
-                    let item = items[context.index].clone();
-                    let main_axis_size = 1;
-                    (item, main_axis_size)
-                });
+    let title = Line::from(" Game text output (FULLSCREEN) ".bold());
+    let block = Block::bordered()
+        .title(title.centered())
+        .border_set(border::THICK)
+        .border_style(Style::default().fg(Color::Green));
 
-                let title = Line::from(" Launcher log (FULLSCREEN) ".bold());
-                let block = Block::bordered()
-                    .title(title.centered())
-                    .border_set(border::THICK)
-                    .border_style(Style::default().fg(Color::Green));
+    let stdout = List::new(stdouts).block(block);
+    frame.render_stateful_widget(stdout, area, &mut app_state.stdout_state);
+}
 
-                let list = ListView::new(builder, items.len()).block(block);
-                frame.render_stateful_widget(list, content_area, &mut app_state.list_state);
-            }
-            FocusedLog::GameStdout => {
-                let stdouts: Vec<ListItem> = app_state
-                    .game_stdout
-                    .iter()
-                    .map(|i| {
-                        let content = Line::from(Span::raw(i.to_string()));
-                        ListItem::new(content)
-                    })
-                    .collect();
+fn render_fullscreen_game_stderr(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
+    let stderrs: Vec<ListItem> = app_state
+        .game_stderr
+        .iter()
+        .map(|i| {
+            let content = Line::from(Span::raw(i.to_string()));
+            ListItem::new(content)
+        })
+        .collect();
 
-                let title = Line::from(" Game text output (FULLSCREEN) ".bold());
-                let block = Block::bordered()
-                    .title(title.centered())
-                    .border_set(border::THICK)
-                    .border_style(Style::default().fg(Color::Green));
+    let title = Line::from(" Game errors (FULLSCREEN) ".bold());
+    let block = Block::bordered()
+        .title(title.centered())
+        .border_set(border::THICK)
+        .border_style(Style::default().fg(Color::Green));
 
-                let stdout = List::new(stdouts).block(block);
-                frame.render_stateful_widget(stdout, content_area, &mut app_state.stdout_state);
-            }
-            FocusedLog::GameStderr => {
-                let stderrs: Vec<ListItem> = app_state
-                    .game_stderr
-                    .iter()
-                    .map(|i| {
-                        let content = Line::from(Span::raw(i.to_string()));
-                        ListItem::new(content)
-                    })
-                    .collect();
+    let stderr = List::new(stderrs).block(block);
+    frame.render_stateful_widget(stderr, area, &mut app_state.stderr_state);
+}
 
-                let title = Line::from(" Game errors (FULLSCREEN) ".bold());
-                let block = Block::bordered()
-                    .title(title.centered())
-                    .border_set(border::THICK)
-                    .border_style(Style::default().fg(Color::Green));
+fn render_normal_view(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
+    let outer_layout = Layout::default()
+        .constraints([Constraint::Percentage(100)].as_ref())
+        .split(area);
 
-                let stderr = List::new(stderrs).block(block);
-                frame.render_stateful_widget(stderr, content_area, &mut app_state.stderr_state);
-            }
-        }
+    let inner_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .margin(2)
+        .constraints(vec![Constraint::Percentage(60), Constraint::Percentage(40)])
+        .split(outer_layout[0]);
+
+    let game_output_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(inner_layout[1]);
+
+    render_launcher_log(frame, inner_layout[0], app_state);
+    render_game_stdout(frame, game_output_layout[0], app_state);
+    render_game_stderr(frame, game_output_layout[1], app_state);
+}
+
+fn render_launcher_log(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
+    let items: Vec<WListItem> = app_state
+        .log
+        .entries()
+        .iter()
+        .map(|i| match i {
+            Entry::Text(text) => WListItem::new(text),
+            Entry::Downloand(download) => match download.status() {
+                DownloadStatus::InProgress => {
+                    if let Some(total) = download.total() {
+                        WListItem::new_gauge(
+                            "Downloading: ",
+                            (download.current() as f64) / (*total as f64),
+                        )
+                    } else {
+                        WListItem::new(format!("Downloading: {}", download.current()))
+                    }
+                }
+                DownloadStatus::Comple => WListItem::new(Line::from(Span::raw(format!(
+                    "Downloaded: {} bytes",
+                    download.current()
+                )))),
+                DownloadStatus::Errored(err) => WListItem::new(format!("Download error: {err}")),
+                DownloadStatus::NotStarted => {
+                    WListItem::new("Download oopsie: something strange happened")
+                }
+            },
+        })
+        .collect();
+
+    let builder = ListBuilder::new(|context| {
+        let item = items[context.index].clone();
+        let main_axis_size = 1;
+        (item, main_axis_size)
+    });
+
+    // Define border style based on focus
+    let launcher_log_border_style = if app_state.focused_log == FocusedLog::LauncherLog {
+        Style::default().fg(Color::Green)
     } else {
-        // Normal mode - show all logs
-        let inner_layout = Layout::default()
-            .direction(Direction::Horizontal)
-            .margin(2)
-            .constraints(vec![Constraint::Percentage(60), Constraint::Percentage(40)])
-            .split(outer_layout[0]);
+        Style::default()
+    };
 
-        let game_output_layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(inner_layout[1]);
+    let title = Line::from(" Launcher log ".bold());
+    let block = Block::bordered()
+        .title(title.centered())
+        .border_set(border::THICK)
+        .border_style(launcher_log_border_style);
 
-        let items: Vec<WListItem> = app_state
-            .log
-            .entries()
-            .iter()
-            .map(|i| match i {
-                Entry::Text(text) => WListItem::new(text),
-                Entry::Downloand(download) => match download.status() {
-                    DownloadStatus::InProgress => {
-                        if let Some(total) = download.total() {
-                            WListItem::new_gauge(
-                                "Downloading: ",
-                                (download.current() as f64) / (*total as f64),
-                            )
-                        } else {
-                            WListItem::new(format!("Downloading: {}", download.current()))
-                        }
-                    }
-                    DownloadStatus::Comple => WListItem::new(Line::from(Span::raw(format!(
-                        "Downloaded: {} bytes",
-                        download.current()
-                    )))),
-                    DownloadStatus::Errored(err) => {
-                        WListItem::new(format!("Download error: {err}"))
-                    }
-                    DownloadStatus::NotStarted => {
-                        WListItem::new("Download oopsie: something strange happened")
-                    }
-                },
-            })
-            .collect();
+    let list = ListView::new(builder, items.len()).block(block);
+    frame.render_stateful_widget(list, area, &mut app_state.list_state);
+}
 
-        let builder = ListBuilder::new(|context| {
-            let item = items[context.index].clone();
+fn render_game_stdout(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
+    let stdouts: Vec<ListItem> = app_state
+        .game_stdout
+        .iter()
+        .map(|i| {
+            let content = Line::from(Span::raw(i.to_string()));
+            ListItem::new(content)
+        })
+        .collect();
 
-            // Return the size of the widget along the main axis.
-            let main_axis_size = 1;
+    // Define border style based on focus
+    let stdout_border_style = if app_state.focused_log == FocusedLog::GameStdout {
+        Style::default().fg(Color::Green)
+    } else {
+        Style::default()
+    };
 
-            (item, main_axis_size)
-        });
+    let title = Line::from(" Game text output ".bold());
+    let block = Block::bordered()
+        .title(title.centered())
+        .border_set(border::THICK)
+        .border_style(stdout_border_style);
 
-        // Define border style based on focus
-        let launcher_log_border_style = if app_state.focused_log == FocusedLog::LauncherLog {
-            Style::default().fg(Color::Green)
-        } else {
-            Style::default()
-        };
+    let stdout = List::new(stdouts).block(block);
+    frame.render_stateful_widget(stdout, area, &mut app_state.stdout_state);
+}
 
-        let title = Line::from(" Launcher log ".bold());
-        let block = Block::bordered()
-            .title(title.centered())
-            .border_set(border::THICK)
-            .border_style(launcher_log_border_style);
+fn render_game_stderr(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
+    let stderrs: Vec<ListItem> = app_state
+        .game_stderr
+        .iter()
+        .map(|i| {
+            let content = Line::from(Span::raw(i.to_string()));
+            ListItem::new(content)
+        })
+        .collect();
 
-        let list = ListView::new(builder, items.len()).block(block);
+    // Define border style based on focus
+    let stderr_border_style = if app_state.focused_log == FocusedLog::GameStderr {
+        Style::default().fg(Color::Green)
+    } else {
+        Style::default()
+    };
 
-        frame.render_stateful_widget(list, inner_layout[0], &mut app_state.list_state);
+    let title = Line::from(" Game errors ".bold());
+    let block = Block::bordered()
+        .title(title.centered())
+        .border_set(border::THICK)
+        .border_style(stderr_border_style);
 
-        let stdouts: Vec<ListItem> = app_state
-            .game_stdout
-            .iter()
-            .map(|i| {
-                let content = Line::from(Span::raw(i.to_string()));
-                ListItem::new(content)
-            })
-            .collect();
+    let stderr = List::new(stderrs).block(block);
+    frame.render_stateful_widget(stderr, area, &mut app_state.stderr_state);
+}
 
-        // Define border style based on focus
-        let stdout_border_style = if app_state.focused_log == FocusedLog::GameStdout {
-            Style::default().fg(Color::Green)
-        } else {
-            Style::default()
-        };
+fn render_exit_popup(frame: &mut Frame, area: Rect, app_state: &AppState) {
+    let popup_area = centered_rect(46, 12, area);
 
-        let title = Line::from(" Game text output ".bold());
-        let block = Block::bordered()
-            .title(title.centered())
-            .border_set(border::THICK)
-            .border_style(stdout_border_style);
+    // Create a popup with text and border
+    let popup_block = Block::default()
+        .title(" Exit Confirmation ".bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow))
+        .border_type(BorderType::Rounded);
 
-        let stdout = List::new(stdouts).block(block);
+    // Controls text to display in the popup
+    let controls_text = match app_state.input_method {
+        InputMethod::Controller => vec![
+            Span::styled(" A", Style::default().fg(Color::Green).bold()),
+            Span::raw(" - Yes    "),
+            Span::styled("B", Style::default().fg(Color::Red).bold()),
+            Span::raw(" - No "),
+        ],
+        InputMethod::Keyboard => vec![
+            Span::styled("Enter", Style::default().fg(Color::Blue).bold()),
+            Span::raw(" - ("),
+            Span::styled("Y", Style::default().fg(Color::Blue).bold()),
+            Span::raw(")es    "),
+            Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
+            Span::raw(" - ("),
+            Span::styled("N", Style::default().fg(Color::Blue).bold()),
+            Span::raw(")o "),
+        ],
+    };
 
-        frame.render_stateful_widget(stdout, game_output_layout[0], &mut app_state.stdout_state);
+    let popup_text = Paragraph::new(vec![
+        Line::from("Are you sure you want to exit?"),
+        Line::from(""),
+        Line::from(controls_text),
+    ])
+    .block(popup_block)
+    .alignment(Alignment::Center)
+    .style(Style::default());
 
-        let stderrs: Vec<ListItem> = app_state
-            .game_stderr
-            .iter()
-            .map(|i| {
-                let content = Line::from(Span::raw(i.to_string()));
-                ListItem::new(content)
-            })
-            .collect();
-
-        // Define border style based on focus
-        let stderr_border_style = if app_state.focused_log == FocusedLog::GameStderr {
-            Style::default().fg(Color::Green)
-        } else {
-            Style::default()
-        };
-
-        let title = Line::from(" Game errors ".bold());
-        let block = Block::bordered()
-            .title(title.centered())
-            .border_set(border::THICK)
-            .border_style(stderr_border_style);
-
-        let stderr = List::new(stderrs).block(block);
-
-        frame.render_stateful_widget(stderr, game_output_layout[1], &mut app_state.stderr_state);
-    }
-
-    // Render exit confirmation popup if needed
-    if app_state.show_exit_popup {
-        let popup_area = centered_rect(46, 12, area);
-
-        // Create a popup with text and border
-        let popup_block = Block::default()
-            .title(" Exit Confirmation ".bold())
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Yellow))
-            .border_type(BorderType::Rounded);
-
-        // Controls text to display in the popup
-        let controls_text = match app_state.input_method {
-            InputMethod::Controller => vec![
-                Span::styled(" A", Style::default().fg(Color::Green).bold()),
-                Span::raw(" - Yes    "),
-                Span::styled("B", Style::default().fg(Color::Red).bold()),
-                Span::raw(" - No "),
-            ],
-            InputMethod::Keyboard => vec![
-                Span::styled("Enter", Style::default().fg(Color::Blue).bold()),
-                Span::raw(" - ("),
-                Span::styled("Y", Style::default().fg(Color::Blue).bold()),
-                Span::raw(")es    "),
-                Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
-                Span::raw(" - ("),
-                Span::styled("N", Style::default().fg(Color::Blue).bold()),
-                Span::raw(")o "),
-            ],
-        };
-
-        let popup_text = Paragraph::new(vec![
-            Line::from("Are you sure you want to exit?"),
-            Line::from(""),
-            Line::from(controls_text),
-        ])
-        .block(popup_block)
-        .alignment(Alignment::Center)
-        .style(Style::default());
-
-        // Render the popup
-        frame.render_widget(Clear, popup_area);
-        frame.render_widget(popup_text, popup_area);
-    }
+    // Render the popup
+    frame.render_widget(Clear, popup_area);
+    frame.render_widget(popup_text, popup_area);
 }
 
 // Helper function to create a centered rectangle of the given size

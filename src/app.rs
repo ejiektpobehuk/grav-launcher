@@ -18,12 +18,24 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
                 }
             }
             Event::ControllerInput(button) => {
-                if button == Button::East {
-                    break;
-                } else if button == Button::DPadRight || button == Button::DPadDown {
-                    app_state.next_log();
-                } else if button == Button::DPadLeft || button == Button::DPadUp {
-                    app_state.prev_log();
+                if app_state.fullscreen_mode {
+                    // In fullscreen mode, East (B) returns to normal view
+                    if button == Button::East {
+                        app_state.exit_fullscreen();
+                    }
+                } else {
+                    // In normal mode
+                    if button == Button::East {
+                        // Exit application with East (B) button when not in fullscreen
+                        break;
+                    } else if button == Button::South {
+                        // Enter fullscreen with South (A) button
+                        app_state.enter_fullscreen();
+                    } else if button == Button::DPadRight || button == Button::DPadDown {
+                        app_state.next_log();
+                    } else if button == Button::DPadLeft || button == Button::DPadUp {
+                        app_state.prev_log();
+                    }
                 }
             }
             Event::NextLog => {
@@ -31,6 +43,12 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
             }
             Event::PrevLog => {
                 app_state.prev_log();
+            }
+            Event::EnterFullscreen => {
+                app_state.enter_fullscreen();
+            }
+            Event::ExitFullscreen => {
+                app_state.exit_fullscreen();
             }
             Event::Resize => {
                 terminal.autoresize()?;

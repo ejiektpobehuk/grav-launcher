@@ -8,6 +8,8 @@ pub enum Event {
     ControllerInput(Button),
     NextLog,
     PrevLog,
+    EnterFullscreen,
+    ExitFullscreen,
     Tick,
     Resize,
     AccessingOnlineHash,

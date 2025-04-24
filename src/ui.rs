@@ -21,6 +21,12 @@ pub enum FocusedLog {
     GameStderr,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputMethod {
+    Controller,
+    Keyboard,
+}
+
 pub struct AppState {
     pub log: Log,
     pub game_stdout: Vec<String>,
@@ -32,6 +38,7 @@ pub struct AppState {
     pub fullscreen_mode: bool,
     pub show_exit_popup: bool,
     pub terminal_focused: bool,
+    pub input_method: InputMethod,
 }
 
 impl AppState {
@@ -47,6 +54,7 @@ impl AppState {
             fullscreen_mode: false,
             show_exit_popup: false,
             terminal_focused: true,
+            input_method: InputMethod::Controller,
         }
     }
 
@@ -87,6 +95,14 @@ impl AppState {
             self.terminal_focused = focused;
         }
     }
+
+    pub const fn controller_input_used(&mut self) {
+        self.input_method = InputMethod::Controller;
+    }
+
+    pub const fn keyboard_input_used(&mut self) {
+        self.input_method = InputMethod::Keyboard;
+    }
 }
 
 pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
@@ -98,15 +114,20 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
         vec![]
     } else if app_state.fullscreen_mode {
         if app_state.terminal_focused {
-            vec![
-                Span::raw(" Press "),
-                Span::styled("B", Style::default().fg(Color::Red).bold()),
-                Span::raw("/"),
-                Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
-                Span::raw("/"),
-                Span::styled("h", Style::default().fg(Color::Blue).bold()),
-                Span::raw(" to return to normal view "),
-            ]
+            match app_state.input_method {
+                InputMethod::Controller => vec![
+                    Span::raw(" Press "),
+                    Span::styled("B", Style::default().fg(Color::Red).bold()),
+                    Span::raw(" to return to normal view "),
+                ],
+                InputMethod::Keyboard => vec![
+                    Span::raw(" Press "),
+                    Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
+                    Span::raw(" or "),
+                    Span::styled("q", Style::default().fg(Color::Blue).bold()),
+                    Span::raw(" to return to normal view "),
+                ],
+            }
         } else {
             vec![
                 Span::raw(" Terminal "),
@@ -121,20 +142,24 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
             Span::raw(" - Controller disabled "),
         ]
     } else {
-        vec![
-            Span::styled(" A", Style::default().fg(Color::Green).bold()),
-            Span::raw("/"),
-            Span::styled("Enter", Style::default().fg(Color::Blue).bold()),
-            Span::raw(" Fullscreen | "),
-            Span::styled("B", Style::default().fg(Color::Red).bold()),
-            Span::raw("/"),
-            Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
-            Span::raw(" Exit | "),
-            Span::styled("D-Pad", Style::default().fg(Color::Yellow).bold()),
-            Span::raw("/"),
-            Span::styled("Arrows", Style::default().fg(Color::Blue).bold()),
-            Span::raw(" Navigate "),
-        ]
+        match app_state.input_method {
+            InputMethod::Controller => vec![
+                Span::styled(" A", Style::default().fg(Color::Green).bold()),
+                Span::raw(" Fullscreen | "),
+                Span::styled("B", Style::default().fg(Color::Red).bold()),
+                Span::raw(" Exit | "),
+                Span::styled("D-Pad", Style::default().fg(Color::Yellow).bold()),
+                Span::raw(" Navigate "),
+            ],
+            InputMethod::Keyboard => vec![
+                Span::styled(" Enter", Style::default().fg(Color::Blue).bold()),
+                Span::raw(" Fullscreen | "),
+                Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
+                Span::raw(" Exit | "),
+                Span::styled("Arrows", Style::default().fg(Color::Blue).bold()),
+                Span::raw(" Navigate "),
+            ],
+        }
     };
 
     let help_line = Line::from(help_text);
@@ -379,20 +404,24 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
             .border_type(BorderType::Rounded);
 
         // Controls text to display in the popup
-        let controls_text = vec![
-            Span::styled(" A", Style::default().fg(Color::Green).bold()),
-            Span::raw("/"),
-            Span::styled("Enter", Style::default().fg(Color::Blue).bold()),
-            Span::raw("/"),
-            Span::styled("y", Style::default().fg(Color::Blue).bold()),
-            Span::raw(" - Yes    "),
-            Span::styled("B", Style::default().fg(Color::Red).bold()),
-            Span::raw("/"),
-            Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
-            Span::raw("/"),
-            Span::styled("n", Style::default().fg(Color::Blue).bold()),
-            Span::raw(" - No "),
-        ];
+        let controls_text = match app_state.input_method {
+            InputMethod::Controller => vec![
+                Span::styled(" A", Style::default().fg(Color::Green).bold()),
+                Span::raw(" - Yes    "),
+                Span::styled("B", Style::default().fg(Color::Red).bold()),
+                Span::raw(" - No "),
+            ],
+            InputMethod::Keyboard => vec![
+                Span::styled("Enter", Style::default().fg(Color::Blue).bold()),
+                Span::raw(" - ("),
+                Span::styled("Y", Style::default().fg(Color::Blue).bold()),
+                Span::raw(")es    "),
+                Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
+                Span::raw(" - ("),
+                Span::styled("N", Style::default().fg(Color::Blue).bold()),
+                Span::raw(")o "),
+            ],
+        };
 
         let popup_text = Paragraph::new(vec![
             Line::from("Are you sure you want to exit?"),

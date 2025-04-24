@@ -14,6 +14,9 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
         terminal.draw(|frame| draw(frame, &mut app_state))?;
         match rx.recv()? {
             Event::Input(event) => {
+                // Update input method to keyboard
+                app_state.keyboard_input_used();
+
                 if app_state.show_exit_popup {
                     // Handle input while exit popup is active
                     match event.code {
@@ -58,6 +61,9 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
                 }
             }
             Event::ControllerInput(button) => {
+                // Update input method to controller
+                app_state.controller_input_used();
+
                 // Only process controller input if terminal is focused
                 if app_state.terminal_focused {
                     if app_state.show_exit_popup {

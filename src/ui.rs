@@ -31,6 +31,7 @@ pub struct AppState {
     pub focused_log: FocusedLog,
     pub fullscreen_mode: bool,
     pub show_exit_popup: bool,
+    pub terminal_focused: bool,
 }
 
 impl AppState {
@@ -45,6 +46,7 @@ impl AppState {
             focused_log: FocusedLog::LauncherLog,
             fullscreen_mode: false,
             show_exit_popup: false,
+            terminal_focused: true,
         }
     }
 
@@ -83,6 +85,12 @@ impl AppState {
     pub fn hide_exit_popup(&mut self) {
         self.show_exit_popup = false;
     }
+
+    pub fn set_terminal_focus(&mut self, focused: bool) {
+        if self.terminal_focused != focused {
+            self.terminal_focused = focused;
+        }
+    }
 }
 
 pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
@@ -93,34 +101,46 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
         // Hide normal controls when popup is shown
         vec![]
     } else if app_state.fullscreen_mode {
-        vec![
-            Span::raw(" Press "),
-            Span::styled("B", Style::default().fg(Color::Red).bold()),
-            Span::raw("/"),
-            Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
-            Span::raw("/"),
-            Span::styled("h", Style::default().fg(Color::Blue).bold()),
-            Span::raw(" to return to normal view "),
-        ]
+        if !app_state.terminal_focused {
+            vec![
+                Span::raw(" Terminal "),
+                Span::styled("NOT FOCUSED", Style::default().fg(Color::Red).bold()),
+                Span::raw(" - Controller disabled "),
+            ]
+        } else {
+            vec![
+                Span::raw(" Press "),
+                Span::styled("B", Style::default().fg(Color::Red).bold()),
+                Span::raw("/"),
+                Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
+                Span::raw("/"),
+                Span::styled("h", Style::default().fg(Color::Blue).bold()),
+                Span::raw(" to return to normal view "),
+            ]
+        }
     } else {
-        vec![
-            Span::styled(" A", Style::default().fg(Color::Green).bold()),
-            Span::raw("/"),
-            Span::styled("Enter", Style::default().fg(Color::Blue).bold()),
-            Span::raw(" Fullscreen | "),
-            Span::styled("B", Style::default().fg(Color::Red).bold()),
-            Span::raw("/"),
-            Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
-            Span::raw(" Exit | "),
-            Span::styled("D-Pad", Style::default().fg(Color::Yellow).bold()),
-            Span::raw("/"),
-            Span::styled("Arrows", Style::default().fg(Color::Blue).bold()),
-            Span::raw("/"),
-            Span::styled("j", Style::default().fg(Color::Blue).bold()),
-            Span::raw(","),
-            Span::styled("k", Style::default().fg(Color::Blue).bold()),
-            Span::raw(" Navigate "),
-        ]
+        if !app_state.terminal_focused {
+            vec![
+                Span::raw(" Terminal "),
+                Span::styled("NOT FOCUSED", Style::default().fg(Color::Red).bold()),
+                Span::raw(" - Controller disabled "),
+            ]
+        } else {
+            vec![
+                Span::styled(" A", Style::default().fg(Color::Green).bold()),
+                Span::raw("/"),
+                Span::styled("Enter", Style::default().fg(Color::Blue).bold()),
+                Span::raw(" Fullscreen | "),
+                Span::styled("B", Style::default().fg(Color::Red).bold()),
+                Span::raw("/"),
+                Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
+                Span::raw(" Exit | "),
+                Span::styled("D-Pad", Style::default().fg(Color::Yellow).bold()),
+                Span::raw("/"),
+                Span::styled("Arrows", Style::default().fg(Color::Blue).bold()),
+                Span::raw(" Navigate "),
+            ]
+        }
     };
 
     let help_line = Line::from(help_text);
@@ -366,7 +386,7 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
 
         // Controls text to display in the popup
         let controls_text = vec![
-            Span::styled("A", Style::default().fg(Color::Green).bold()),
+            Span::styled(" A", Style::default().fg(Color::Green).bold()),
             Span::raw("/"),
             Span::styled("Enter", Style::default().fg(Color::Blue).bold()),
             Span::raw("/"),
@@ -377,7 +397,7 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
             Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
             Span::raw("/"),
             Span::styled("n", Style::default().fg(Color::Blue).bold()),
-            Span::raw(" - No"),
+            Span::raw(" - No "),
         ];
 
         let popup_text = Paragraph::new(vec![

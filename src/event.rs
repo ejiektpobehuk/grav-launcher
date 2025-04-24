@@ -10,6 +10,7 @@ pub enum Event {
     PrevLog,
     EnterFullscreen,
     ExitFullscreen,
+    TerminalFocusChanged(bool),
     Tick,
     Resize,
     AccessingOnlineHash,

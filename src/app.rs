@@ -10,6 +10,7 @@ use std::sync::mpsc;
 
 pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) -> Result<()> {
     let mut app_state = AppState::init();
+
     loop {
         terminal.draw(|frame| draw(frame, &mut app_state))?;
         match rx.recv()? {
@@ -58,43 +59,46 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
                 }
             }
             Event::ControllerInput(button) => {
-                if app_state.show_exit_popup {
-                    // Handle controller input while exit popup is active
-                    match button {
-                        // Confirm exit with A button
-                        Button::South => {
-                            break;
+                // Only process controller input if terminal is focused
+                if app_state.terminal_focused {
+                    if app_state.show_exit_popup {
+                        // Handle controller input while exit popup is active
+                        match button {
+                            // Confirm exit with A button
+                            Button::South => {
+                                break;
+                            }
+                            // Cancel exit with B button
+                            Button::East => {
+                                app_state.hide_exit_popup();
+                            }
+                            _ => {}
                         }
-                        // Cancel exit with B button
-                        Button::East => {
-                            app_state.hide_exit_popup();
+                    } else if app_state.fullscreen_mode {
+                        // In fullscreen mode, East (B) returns to normal view
+                        if button == Button::East {
+                            app_state.exit_fullscreen();
                         }
-                        _ => {}
-                    }
-                } else if app_state.fullscreen_mode {
-                    // In fullscreen mode, East (B) returns to normal view
-                    if button == Button::East {
-                        app_state.exit_fullscreen();
-                    }
-                } else {
-                    // In normal mode
-                    match button {
-                        // Show exit confirmation with East (B) button
-                        Button::East => {
-                            app_state.show_exit_popup();
+                    } else {
+                        // In normal mode
+                        match button {
+                            // Show exit confirmation with East (B) button
+                            Button::East => {
+                                app_state.show_exit_popup();
+                            }
+                            // Enter fullscreen with South (A) button
+                            Button::South => {
+                                app_state.enter_fullscreen();
+                            }
+                            // D-pad navigation
+                            _ if button == Button::DPadRight || button == Button::DPadDown => {
+                                app_state.next_log();
+                            }
+                            _ if button == Button::DPadLeft || button == Button::DPadUp => {
+                                app_state.prev_log();
+                            }
+                            _ => {}
                         }
-                        // Enter fullscreen with South (A) button
-                        Button::South => {
-                            app_state.enter_fullscreen();
-                        }
-                        // D-pad navigation
-                        _ if button == Button::DPadRight || button == Button::DPadDown => {
-                            app_state.next_log();
-                        }
-                        _ if button == Button::DPadLeft || button == Button::DPadUp => {
-                            app_state.prev_log();
-                        }
-                        _ => {}
                     }
                 }
             }
@@ -109,6 +113,9 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
             }
             Event::ExitFullscreen => {
                 app_state.exit_fullscreen();
+            }
+            Event::TerminalFocusChanged(focused) => {
+                app_state.set_terminal_focus(focused);
             }
             Event::Resize => {
                 terminal.autoresize()?;

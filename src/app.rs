@@ -20,7 +20,17 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
             Event::ControllerInput(button) => {
                 if button == Button::East {
                     break;
+                } else if button == Button::DPadRight || button == Button::DPadDown {
+                    app_state.next_log();
+                } else if button == Button::DPadLeft || button == Button::DPadUp {
+                    app_state.prev_log();
                 }
+            }
+            Event::NextLog => {
+                app_state.next_log();
+            }
+            Event::PrevLog => {
+                app_state.prev_log();
             }
             Event::Resize => {
                 terminal.autoresize()?;

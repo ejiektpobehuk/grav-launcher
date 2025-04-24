@@ -55,6 +55,9 @@ fn controller_input_handling(tx: mpsc::Sender<Event>) {
                     tx.send(Event::ControllerInput(button)).unwrap();
                 }
             }
+            
+            // Sleep to prevent high CPU usage
+            thread::sleep(Duration::from_millis(10));
         }
     });
 }

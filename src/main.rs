@@ -3,6 +3,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use color_eyre::Result;
+use gilrs::{Button, Event as GilrsEvent, EventType, Gilrs};
 
 use crossterm::event as terminal_event;
 
@@ -20,6 +21,11 @@ fn main() -> Result<()> {
     color_eyre::install()?;
     let mut terminal = ratatui::init();
     let (tx, rx) = mpsc::channel();
+
+    // Initialize controller input handler
+    controller_input_handling(tx.clone());
+
+    // Initialize keyboard input handler
     input_handling(tx.clone());
 
     let thread_join_handle = thread::spawn(move || launcher::launcher_logic(tx));
@@ -30,6 +36,27 @@ fn main() -> Result<()> {
 
     let _res = thread_join_handle.join();
     app_result
+}
+
+fn controller_input_handling(tx: mpsc::Sender<Event>) {
+    thread::spawn(move || {
+        let mut gilrs = match Gilrs::new() {
+            Ok(gilrs) => gilrs,
+            Err(e) => {
+                eprintln!("Failed to initialize gilrs: {}", e);
+                return;
+            }
+        };
+
+        loop {
+            // Process controller events
+            while let Some(gilrs_event) = gilrs.next_event() {
+                if let EventType::ButtonPressed(button, _) = gilrs_event.event {
+                    tx.send(Event::ControllerInput(button)).unwrap();
+                }
+            }
+        }
+    });
 }
 
 fn input_handling(tx: mpsc::Sender<Event>) {

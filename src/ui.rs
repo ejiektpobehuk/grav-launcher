@@ -65,9 +65,7 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
         .entries()
         .iter()
         .map(|i| match i {
-            Entry::Text(text) => {
-                WListItem::new(text)
-            }
+            Entry::Text(text) => WListItem::new(text),
             Entry::Downloand(download) => match download.status() {
                 DownloadStatus::InProgress => {
                     if let Some(total) = download.total() {
@@ -76,24 +74,17 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
                             (download.current() as f64) / (total.clone() as f64),
                         )
                     } else {
-                        WListItem::new(format!(
-                            "Downloading: {}",
-                            download.current()
-                        ))
+                        WListItem::new(format!("Downloading: {}", download.current()))
                     }
                 }
-                DownloadStatus::Comple => {
-                    WListItem::new(Line::from(Span::raw(format!(
-                        "Downloaded: {} bytes",
-                        download.current()
-                    ))))
+                DownloadStatus::Comple => WListItem::new(Line::from(Span::raw(format!(
+                    "Downloaded: {} bytes",
+                    download.current()
+                )))),
+                DownloadStatus::Errored(err) => WListItem::new(format!("Download error: {err}")),
+                DownloadStatus::NotStarted => {
+                    WListItem::new("Download oopsie: something strange happened")
                 }
-                DownloadStatus::Errored(err) => {
-                    WListItem::new(format!("Download error: {err}"))
-                }
-                DownloadStatus::NotStarted => WListItem::new(
-                    "Download oopsie: something strange happened",
-                ),
             },
         })
         .collect();

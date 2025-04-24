@@ -3,6 +3,7 @@ use crate::ui::AppState;
 use crate::ui::draw;
 use color_eyre::Result;
 use crossterm::event as terminal_event;
+use gilrs::Button;
 use ratatui::prelude::*;
 use std::sync::mpsc;
 
@@ -13,6 +14,11 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
         match rx.recv()? {
             Event::Input(event) => {
                 if event.code == terminal_event::KeyCode::Char('q') {
+                    break;
+                }
+            }
+            Event::ControllerInput(button) => {
+                if button == Button::East {
                     break;
                 }
             }

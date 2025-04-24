@@ -10,7 +10,7 @@ use ratatui::{
     style::{Color, Style, Stylize},
     symbols::border,
     text::Line,
-    widgets::{Block, List, ListItem, ListState},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
 };
 use tui_widget_list::{ListBuilder, ListState as WListState, ListView};
 
@@ -78,6 +78,27 @@ impl AppState {
 pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
     let area = frame.area();
 
+    // Create help text for controls
+    let help_text = if app_state.fullscreen_mode {
+        vec![
+            Span::raw(" Press "),
+            Span::styled("B", Style::default().fg(Color::Red).bold()),
+            Span::raw(" to return to normal view "),
+        ]
+    } else {
+        vec![
+            Span::styled(" A", Style::default().fg(Color::Green).bold()),
+            Span::raw(" Fullscreen | "),
+            Span::styled("B", Style::default().fg(Color::Red).bold()),
+            Span::raw(" Exit | "),
+            Span::styled("D-Pad", Style::default().fg(Color::Yellow).bold()),
+            Span::raw(" Navigate logs "),
+        ]
+    };
+    
+    let help_line = Line::from(help_text);
+    
+    // Main layout that uses the full area
     let outer_layout = Layout::default()
         .constraints([Constraint::Percentage(100)].as_ref())
         .split(area);
@@ -85,6 +106,7 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
     let title = Line::from(" GRAV launcher ".bold());
     let block = Block::bordered()
         .title(title.centered())
+        .title_bottom(help_line.right_aligned())
         .border_set(border::THICK);
     frame.render_widget(block, area);
 

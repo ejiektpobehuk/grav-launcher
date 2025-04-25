@@ -569,37 +569,37 @@ fn render_game_stderr(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
 fn render_exit_popup(frame: &mut Frame, area: Rect, app_state: &AppState) {
     let popup_area = centered_rect(46, 12, area);
 
-    // Create a popup with text and border
-    let popup_block = Block::default()
-        .title(" Exit Confirmation ".bold())
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow))
-        .border_type(BorderType::Rounded);
-
     // Controls text to display in the popup
     let controls_text = match app_state.input_method {
-        InputMethod::Controller => vec![
+        InputMethod::Controller => Line::from(vec![
             Span::styled(" A", Style::default().fg(Color::Green).bold()),
             Span::raw(" - Yes    "),
             Span::styled("B", Style::default().fg(Color::Red).bold()),
             Span::raw(" - No "),
-        ],
-        InputMethod::Keyboard => vec![
-            Span::styled("Enter", Style::default().fg(Color::Blue).bold()),
+        ]),
+        InputMethod::Keyboard => Line::from(vec![
+            Span::styled(" Enter", Style::default().fg(Color::Blue).bold()),
             Span::raw(" - ("),
             Span::styled("Y", Style::default().fg(Color::Blue).bold()),
-            Span::raw(")es    "),
+            Span::raw(")es | "),
             Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
             Span::raw(" - ("),
             Span::styled("N", Style::default().fg(Color::Blue).bold()),
             Span::raw(")o "),
-        ],
+        ]),
     };
 
+    // Create a popup with no title and controls in the border
+    let popup_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow))
+        .border_type(BorderType::Rounded)
+        .title_bottom(controls_text.right_aligned());
+
     let popup_text = Paragraph::new(vec![
+        Line::from(""),
         Line::from("Are you sure you want to exit?"),
         Line::from(""),
-        Line::from(controls_text),
     ])
     .block(popup_block)
     .alignment(Alignment::Center)

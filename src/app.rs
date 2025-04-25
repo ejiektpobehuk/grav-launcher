@@ -1,6 +1,6 @@
 use crate::event::Event;
-use crate::ui::AppState;
 use crate::ui::draw;
+use crate::ui::{AppState, DisplayMode, ExitPopupState, TerminalFocus, UpdateStatus};
 use color_eyre::Result;
 use crossterm::event::KeyCode;
 use gilrs::Button;
@@ -23,7 +23,7 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
             }
             Event::ControllerInput(button) => {
                 app_state.controller_input_used();
-                if app_state.terminal_focused
+                if app_state.terminal_focus == TerminalFocus::Focused
                     && handle_controller_input(&mut app_state, &tx, button)
                 {
                     break;
@@ -45,7 +45,7 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
 /// Handle keyboard input based on current app state
 /// Returns true if the application should exit
 fn handle_keyboard_input(app_state: &mut AppState, tx: &mpsc::Sender<Event>, key: KeyCode) -> bool {
-    if app_state.show_exit_popup {
+    if app_state.exit_popup == ExitPopupState::Visible {
         match key {
             // Confirm exit
             KeyCode::Enter | KeyCode::Char('y') => {
@@ -57,7 +57,7 @@ fn handle_keyboard_input(app_state: &mut AppState, tx: &mpsc::Sender<Event>, key
             }
             _ => {}
         }
-    } else if app_state.fullscreen_mode {
+    } else if app_state.display_mode == DisplayMode::Fullscreen {
         // In fullscreen mode, Escape/h/q return to normal view
         match key {
             KeyCode::Esc | KeyCode::Char('h' | 'q') => {
@@ -86,7 +86,9 @@ fn handle_keyboard_input(app_state: &mut AppState, tx: &mpsc::Sender<Event>, key
             // Request launcher update
             KeyCode::Char('u') => {
                 // Only send the event if an update is available and not already in progress
-                if app_state.launcher_update_available.is_some() && !app_state.update_requested {
+                if app_state.launcher_update_available.is_some()
+                    && app_state.update_status == UpdateStatus::NotRequested
+                {
                     let _ = tx.send(Event::RequestLauncherUpdate);
                 }
             }
@@ -103,7 +105,7 @@ fn handle_controller_input(
     tx: &mpsc::Sender<Event>,
     button: Button,
 ) -> bool {
-    if app_state.show_exit_popup {
+    if app_state.exit_popup == ExitPopupState::Visible {
         // Handle controller input while exit popup is active
         match button {
             // Confirm exit with A button
@@ -116,7 +118,7 @@ fn handle_controller_input(
             }
             _ => {}
         }
-    } else if app_state.fullscreen_mode {
+    } else if app_state.display_mode == DisplayMode::Fullscreen {
         // In fullscreen mode, East (B) returns to normal view
         if button == Button::East {
             app_state.exit_fullscreen();
@@ -135,7 +137,9 @@ fn handle_controller_input(
             // Request launcher update with North (Y) button
             Button::North => {
                 // Only send the event if an update is available and not already in progress
-                if app_state.launcher_update_available.is_some() && !app_state.update_requested {
+                if app_state.launcher_update_available.is_some()
+                    && app_state.update_status == UpdateStatus::NotRequested
+                {
                     let _ = tx.send(Event::RequestLauncherUpdate);
                 }
             }
@@ -269,9 +273,9 @@ fn handle_system_event(app_state: &mut AppState, tx: &mpsc::Sender<Event>, event
         Event::RequestLauncherUpdate => {
             // Start the update process if an update is available and not already in progress
             if let Some(version) = &app_state.launcher_update_available {
-                if !app_state.update_requested {
+                if app_state.update_status == UpdateStatus::NotRequested {
                     // Mark that an update is in progress
-                    app_state.update_requested = true;
+                    app_state.update_status = UpdateStatus::Requested;
 
                     // Clone the version since we need to move it into the thread
                     let version_clone = version.clone();

@@ -27,6 +27,30 @@ pub enum InputMethod {
     Keyboard,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DisplayMode {
+    Normal,
+    Fullscreen,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExitPopupState {
+    Hidden,
+    Visible,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TerminalFocus {
+    Focused,
+    Unfocused,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpdateStatus {
+    NotRequested,
+    Requested,
+}
+
 pub struct AppState {
     pub log: Log,
     pub game_stdout: Vec<String>,
@@ -35,12 +59,12 @@ pub struct AppState {
     pub stdout_state: ListState,
     pub stderr_state: ListState,
     pub focused_log: FocusedLog,
-    pub fullscreen_mode: bool,
-    pub show_exit_popup: bool,
-    pub terminal_focused: bool,
+    pub display_mode: DisplayMode,
+    pub exit_popup: ExitPopupState,
+    pub terminal_focus: TerminalFocus,
     pub input_method: InputMethod,
     pub launcher_update_available: Option<String>,
-    pub update_requested: bool,
+    pub update_status: UpdateStatus,
 }
 
 impl AppState {
@@ -53,12 +77,12 @@ impl AppState {
             stdout_state: ListState::default(),
             stderr_state: ListState::default(),
             focused_log: FocusedLog::LauncherLog,
-            fullscreen_mode: false,
-            show_exit_popup: false,
-            terminal_focused: true,
+            display_mode: DisplayMode::Normal,
+            exit_popup: ExitPopupState::Hidden,
+            terminal_focus: TerminalFocus::Focused,
             input_method: InputMethod::Controller,
             launcher_update_available: None,
-            update_requested: false,
+            update_status: UpdateStatus::NotRequested,
         }
     }
 
@@ -79,24 +103,30 @@ impl AppState {
     }
 
     pub const fn enter_fullscreen(&mut self) {
-        self.fullscreen_mode = true;
+        self.display_mode = DisplayMode::Fullscreen;
     }
 
     pub const fn exit_fullscreen(&mut self) {
-        self.fullscreen_mode = false;
+        self.display_mode = DisplayMode::Normal;
     }
 
     pub const fn show_exit_popup(&mut self) {
-        self.show_exit_popup = true;
+        self.exit_popup = ExitPopupState::Visible;
     }
 
     pub const fn hide_exit_popup(&mut self) {
-        self.show_exit_popup = false;
+        self.exit_popup = ExitPopupState::Hidden;
     }
 
-    pub const fn set_terminal_focus(&mut self, focused: bool) {
-        if self.terminal_focused != focused {
-            self.terminal_focused = focused;
+    pub fn set_terminal_focus(&mut self, focused: bool) {
+        if (focused && self.terminal_focus == TerminalFocus::Unfocused)
+            || (!focused && self.terminal_focus == TerminalFocus::Focused)
+        {
+            self.terminal_focus = if focused {
+                TerminalFocus::Focused
+            } else {
+                TerminalFocus::Unfocused
+            };
         }
     }
 
@@ -115,14 +145,14 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
     // Render the main UI frame with title and help text
     render_main_frame(frame, area, app_state);
 
-    if app_state.fullscreen_mode {
+    if app_state.display_mode == DisplayMode::Fullscreen {
         render_fullscreen_view(frame, area, app_state);
     } else {
         render_normal_view(frame, area, app_state);
     }
 
     // Render exit confirmation popup if needed
-    if app_state.show_exit_popup {
+    if app_state.exit_popup == ExitPopupState::Visible {
         render_exit_popup(frame, area, app_state);
     }
 }
@@ -140,10 +170,10 @@ fn render_main_frame(frame: &mut Frame, area: Rect, app_state: &AppState) {
 }
 
 fn get_help_text(app_state: &AppState) -> Vec<Span> {
-    if app_state.show_exit_popup {
+    if app_state.exit_popup == ExitPopupState::Visible {
         // Hide normal controls when popup is shown
         vec![]
-    } else if app_state.fullscreen_mode {
+    } else if app_state.display_mode == DisplayMode::Fullscreen {
         match app_state.input_method {
             InputMethod::Controller => vec![
                 Span::styled(" B", Style::default().fg(Color::Red).bold()),
@@ -154,7 +184,7 @@ fn get_help_text(app_state: &AppState) -> Vec<Span> {
                 Span::raw(" Back "),
             ],
         }
-    } else if !app_state.terminal_focused {
+    } else if app_state.terminal_focus == TerminalFocus::Unfocused {
         vec![
             Span::raw(" Terminal "),
             Span::styled("NOT FOCUSED", Style::default().fg(Color::Red).bold()),
@@ -172,7 +202,9 @@ fn get_help_text(app_state: &AppState) -> Vec<Span> {
                 ];
 
                 // Only show update hint if an update is available and not already in progress
-                if app_state.launcher_update_available.is_some() && !app_state.update_requested {
+                if app_state.launcher_update_available.is_some()
+                    && app_state.update_status == UpdateStatus::NotRequested
+                {
                     controls.push(Span::raw(" | "));
                     controls.push(Span::styled("Y", Style::default().fg(Color::Yellow).bold()));
                     controls.push(Span::raw(" Update"));
@@ -196,7 +228,9 @@ fn get_help_text(app_state: &AppState) -> Vec<Span> {
                 ];
 
                 // Only show update hint if an update is available and not already in progress
-                if app_state.launcher_update_available.is_some() && !app_state.update_requested {
+                if app_state.launcher_update_available.is_some()
+                    && app_state.update_status == UpdateStatus::NotRequested
+                {
                     controls.push(Span::raw(" | "));
                     controls.push(Span::styled("u", Style::default().fg(Color::Yellow).bold()));
                     controls.push(Span::raw(" Update"));

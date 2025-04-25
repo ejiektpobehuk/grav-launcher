@@ -2,6 +2,8 @@
 name = "grav-launcher"
 version = "0.1.2"
 edition = "2024"
+repository = "https://github.com/ejiektpobehuk/grav-launcher"
+license = "MIT"
 
 [dependencies]
 color-eyre = "0.6.3"
@@ -10,7 +12,8 @@ eyre = "0.6.12"
 futures = "0.3.30"
 gilrs = "0.11.0"
 ratatui = "0.29.0"
-reqwest = { version = "0.12.15", default-features = false, features = ["blocking", "rustls-tls"] }
+reqwest = { version = "0.12.15", default-features = false, features = ["blocking", "rustls-tls", "json"] }
+serde = { version = "1.0.196", features = ["derive"] }
 sha2 = "0.10.8"
 throbber-widgets-tui = "0.8.0"
 tui-widget-list = "0.13.2"

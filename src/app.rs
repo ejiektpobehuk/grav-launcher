@@ -6,22 +6,26 @@ use crossterm::event::KeyCode;
 use gilrs::Button;
 use ratatui::prelude::*;
 use std::sync::mpsc;
+use std::thread;
 
 pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) -> Result<()> {
     let mut app_state = AppState::init();
+    let (tx, _rx) = mpsc::channel();
 
     loop {
         terminal.draw(|frame| draw(frame, &mut app_state))?;
         match rx.recv()? {
             Event::Input(event) => {
                 app_state.keyboard_input_used();
-                if handle_keyboard_input(&mut app_state, event.code) {
+                if handle_keyboard_input(&mut app_state, &tx, event.code) {
                     break;
                 }
             }
             Event::ControllerInput(button) => {
                 app_state.controller_input_used();
-                if app_state.terminal_focused && handle_controller_input(&mut app_state, button) {
+                if app_state.terminal_focused
+                    && handle_controller_input(&mut app_state, &tx, button)
+                {
                     break;
                 }
             }
@@ -32,7 +36,7 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
                 terminal.autoresize()?;
             }
             Event::Tick => {}
-            event => handle_system_event(&mut app_state, event),
+            event => handle_system_event(&mut app_state, &tx, event),
         }
     }
     Ok(())
@@ -40,7 +44,7 @@ pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) ->
 
 /// Handle keyboard input based on current app state
 /// Returns true if the application should exit
-const fn handle_keyboard_input(app_state: &mut AppState, key: KeyCode) -> bool {
+fn handle_keyboard_input(app_state: &mut AppState, tx: &mpsc::Sender<Event>, key: KeyCode) -> bool {
     if app_state.show_exit_popup {
         match key {
             // Confirm exit
@@ -79,6 +83,13 @@ const fn handle_keyboard_input(app_state: &mut AppState, key: KeyCode) -> bool {
             KeyCode::Left | KeyCode::Up | KeyCode::Char('k') => {
                 app_state.prev_log();
             }
+            // Request launcher update
+            KeyCode::Char('u') => {
+                // Only send the event if an update is available and not already in progress
+                if app_state.launcher_update_available.is_some() && !app_state.update_requested {
+                    let _ = tx.send(Event::RequestLauncherUpdate);
+                }
+            }
             _ => {}
         }
     }
@@ -87,7 +98,11 @@ const fn handle_keyboard_input(app_state: &mut AppState, key: KeyCode) -> bool {
 
 /// Handle controller input based on current app state
 /// Returns true if the application should exit
-fn handle_controller_input(app_state: &mut AppState, button: Button) -> bool {
+fn handle_controller_input(
+    app_state: &mut AppState,
+    tx: &mpsc::Sender<Event>,
+    button: Button,
+) -> bool {
     if app_state.show_exit_popup {
         // Handle controller input while exit popup is active
         match button {
@@ -117,6 +132,13 @@ fn handle_controller_input(app_state: &mut AppState, button: Button) -> bool {
             Button::South => {
                 app_state.enter_fullscreen();
             }
+            // Request launcher update with North (Y) button
+            Button::North => {
+                // Only send the event if an update is available and not already in progress
+                if app_state.launcher_update_available.is_some() && !app_state.update_requested {
+                    let _ = tx.send(Event::RequestLauncherUpdate);
+                }
+            }
             // D-pad navigation
             _ if button == Button::DPadRight || button == Button::DPadDown => {
                 app_state.next_log();
@@ -131,7 +153,7 @@ fn handle_controller_input(app_state: &mut AppState, button: Button) -> bool {
 }
 
 /// Handle system events like hashing, downloads, and game execution
-fn handle_system_event(app_state: &mut AppState, event: Event) {
+fn handle_system_event(app_state: &mut AppState, tx: &mpsc::Sender<Event>, event: Event) {
     match event {
         Event::AccessingOnlineHash => {
             app_state.log.remote_hash_msg = Some("accessing".into());
@@ -153,7 +175,7 @@ fn handle_system_event(app_state: &mut AppState, event: Event) {
             if eq {
                 app_state
                     .log
-                    .push("Hashes are the same: You have the latest verstion of the game. ".into());
+                    .push("Hashes are the same: You have the latest version of the game. ".into());
             } else {
                 app_state
                     .log
@@ -179,7 +201,7 @@ fn handle_system_event(app_state: &mut AppState, event: Event) {
         }
         Event::GameBinaryUpdated => {}
         Event::Launching => {
-            app_state.log.push("Launcning the game. . .".to_string());
+            app_state.log.push("Launching the game...".to_string());
         }
         Event::GameExecutionError(err) => {
             app_state.log.push(format!("Game execution error: {err}"));
@@ -192,6 +214,79 @@ fn handle_system_event(app_state: &mut AppState, event: Event) {
         }
         Event::LauncherError(err) => {
             app_state.log.push(format!("Error: {err}"));
+        }
+        // Launcher update events
+        Event::CheckingForLauncherUpdate => {
+            app_state.log.launcher_status_msg =
+                Some("Launcher: checking for a newer version".into());
+        }
+        Event::LauncherUpdateAvailable(version) => {
+            // Get the current version from our crate
+            let current_version = crate::VERSION;
+            app_state.log.launcher_status_msg = Some(format!(
+                "Launcher: an update is available {current_version} -> {version}"
+            ));
+            app_state.launcher_update_available = Some(version);
+        }
+        Event::LauncherNoUpdateAvailable => {
+            // Include the current version in the status message
+            let current_version = crate::VERSION;
+            app_state.log.launcher_status_msg = Some(format!(
+                "Launcher: already at the latest version - {current_version}"
+            ));
+        }
+        Event::StartDownloadingLauncherUpdate => {
+            // Create a download entry specifically for the launcher update
+            app_state.log.launcher_update = Some(crate::ui::log::Download::new(None));
+        }
+        Event::LauncherDownloadProgress(downloaded, total) => {
+            if let Some(download) = &mut app_state.log.launcher_update {
+                // Update the download progress
+                download.set_progress(downloaded);
+
+                // If we haven't set the total yet and it's now available, set it
+                if download.total().is_none() && total.is_some() {
+                    download.set_total(total);
+                }
+            }
+        }
+        Event::LauncherUpdateDownloaded => {
+            if let Some(download) = &mut app_state.log.launcher_update {
+                download.mark_complete();
+            }
+        }
+        Event::LauncherUpdateReady => {
+            app_state.log.launcher_status_msg =
+                Some("Launcher: update ready, restart to apply".into());
+        }
+        Event::LauncherApplyingUpdate => {
+            app_state.log.launcher_status_msg = Some("Launcher: applying update...".into());
+        }
+        Event::LauncherUpdateApplied => {
+            app_state.log.launcher_status_msg =
+                Some("Launcher: update applied. Please restart the launcher.".into());
+        }
+        Event::RequestLauncherUpdate => {
+            // Start the update process if an update is available and not already in progress
+            if let Some(version) = &app_state.launcher_update_available {
+                if !app_state.update_requested {
+                    // Mark that an update is in progress
+                    app_state.update_requested = true;
+
+                    // Clone the version since we need to move it into the thread
+                    let version_clone = version.clone();
+
+                    // Create a new thread to handle the download
+                    let tx_clone = tx.clone();
+                    thread::spawn(move || {
+                        if let Err(e) = crate::update::update_launcher(&version_clone, &tx_clone) {
+                            let _ = tx_clone.send(Event::LauncherError(format!(
+                                "Failed to update launcher: {e}"
+                            )));
+                        }
+                    });
+                }
+            }
         }
         _ => {}
     }

@@ -17,8 +17,11 @@ mod app;
 mod hash;
 mod launcher;
 mod ui;
+mod update;
 
 static BASE_URL: &str = "https://grav.arigven.games/builds/GRAV.x86_64";
+static VERSION: &str = env!("CARGO_PKG_VERSION");
+static REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 
 fn enable_focus_reporting() -> Result<()> {
     // Enable focus event reporting in terminal
@@ -40,11 +43,36 @@ fn main() -> Result<()> {
     // Enable terminal focus event reporting
     enable_focus_reporting()?;
 
-    // Initialize controller input handler
+    // Initialize controller input handling
     controller_input_handling(tx.clone());
 
     // Initialize keyboard input handler
     input_handling(tx.clone());
+
+    // Check for launcher update
+    let update_tx = tx.clone();
+    thread::spawn(move || {
+        // Check if there's a pending update to apply
+        if let Err(e) = update::apply_update(&update_tx) {
+            let _ = update_tx.send(Event::LauncherError(format!("Error applying update: {e}")));
+        }
+
+        // Check for new updates
+        let _ = update_tx.send(Event::CheckingForLauncherUpdate);
+        match update::check_for_update(VERSION) {
+            Ok(Some(version)) => {
+                let _ = update_tx.send(Event::LauncherUpdateAvailable(version));
+            }
+            Ok(None) => {
+                let _ = update_tx.send(Event::LauncherNoUpdateAvailable);
+            }
+            Err(e) => {
+                let _ = update_tx.send(Event::LauncherError(format!(
+                    "Failed to check for launcher updates: {e}"
+                )));
+            }
+        }
+    });
 
     let thread_join_handle = thread::spawn(move || launcher::launcher_logic(tx));
 

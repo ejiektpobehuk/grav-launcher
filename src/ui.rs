@@ -1,4 +1,4 @@
-mod log;
+pub mod log;
 use crate::ui::log::{Entry, Log};
 mod list;
 use crate::ui::list::ListItem as WListItem;
@@ -39,6 +39,8 @@ pub struct AppState {
     pub show_exit_popup: bool,
     pub terminal_focused: bool,
     pub input_method: InputMethod,
+    pub launcher_update_available: Option<String>,
+    pub update_requested: bool,
 }
 
 impl AppState {
@@ -55,6 +57,8 @@ impl AppState {
             show_exit_popup: false,
             terminal_focused: true,
             input_method: InputMethod::Controller,
+            launcher_update_available: None,
+            update_requested: false,
         }
     }
 
@@ -140,27 +144,15 @@ fn get_help_text(app_state: &AppState) -> Vec<Span> {
         // Hide normal controls when popup is shown
         vec![]
     } else if app_state.fullscreen_mode {
-        if app_state.terminal_focused {
-            match app_state.input_method {
-                InputMethod::Controller => vec![
-                    Span::raw(" Press "),
-                    Span::styled("B", Style::default().fg(Color::Red).bold()),
-                    Span::raw(" to return to normal view "),
-                ],
-                InputMethod::Keyboard => vec![
-                    Span::raw(" Press "),
-                    Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
-                    Span::raw(" or "),
-                    Span::styled("q", Style::default().fg(Color::Blue).bold()),
-                    Span::raw(" to return to normal view "),
-                ],
-            }
-        } else {
-            vec![
-                Span::raw(" Terminal "),
-                Span::styled("NOT FOCUSED", Style::default().fg(Color::Red).bold()),
-                Span::raw(" - Controller disabled "),
-            ]
+        match app_state.input_method {
+            InputMethod::Controller => vec![
+                Span::styled(" B", Style::default().fg(Color::Red).bold()),
+                Span::raw(" Back "),
+            ],
+            InputMethod::Keyboard => vec![
+                Span::styled(" Esc", Style::default().fg(Color::Blue).bold()),
+                Span::raw(" Back "),
+            ],
         }
     } else if !app_state.terminal_focused {
         vec![
@@ -169,23 +161,56 @@ fn get_help_text(app_state: &AppState) -> Vec<Span> {
             Span::raw(" - Controller disabled "),
         ]
     } else {
+        // Add controls based on input method
         match app_state.input_method {
-            InputMethod::Controller => vec![
-                Span::styled(" A", Style::default().fg(Color::Green).bold()),
-                Span::raw(" Fullscreen | "),
-                Span::styled("B", Style::default().fg(Color::Red).bold()),
-                Span::raw(" Exit | "),
-                Span::styled("D-Pad", Style::default().fg(Color::Yellow).bold()),
-                Span::raw(" Navigate "),
-            ],
-            InputMethod::Keyboard => vec![
-                Span::styled(" Enter", Style::default().fg(Color::Blue).bold()),
-                Span::raw(" Fullscreen | "),
-                Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
-                Span::raw(" Exit | "),
-                Span::styled("Arrows", Style::default().fg(Color::Blue).bold()),
-                Span::raw(" Navigate "),
-            ],
+            InputMethod::Controller => {
+                let mut controls = vec![
+                    Span::styled(" A", Style::default().fg(Color::Green).bold()),
+                    Span::raw(" Fullscreen | "),
+                    Span::styled("B", Style::default().fg(Color::Red).bold()),
+                    Span::raw(" Exit"),
+                ];
+
+                // Only show update hint if an update is available and not already in progress
+                if app_state.launcher_update_available.is_some() && !app_state.update_requested {
+                    controls.push(Span::raw(" | "));
+                    controls.push(Span::styled("Y", Style::default().fg(Color::Yellow).bold()));
+                    controls.push(Span::raw(" Update"));
+                }
+
+                controls.push(Span::raw(" | "));
+                controls.push(Span::styled(
+                    "D-Pad",
+                    Style::default().fg(Color::Yellow).bold(),
+                ));
+                controls.push(Span::raw(" Navigate "));
+
+                controls
+            }
+            InputMethod::Keyboard => {
+                let mut controls = vec![
+                    Span::styled(" Enter", Style::default().fg(Color::Blue).bold()),
+                    Span::raw(" Fullscreen | "),
+                    Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
+                    Span::raw(" Exit"),
+                ];
+
+                // Only show update hint if an update is available and not already in progress
+                if app_state.launcher_update_available.is_some() && !app_state.update_requested {
+                    controls.push(Span::raw(" | "));
+                    controls.push(Span::styled("u", Style::default().fg(Color::Yellow).bold()));
+                    controls.push(Span::raw(" Update"));
+                }
+
+                controls.push(Span::raw(" | "));
+                controls.push(Span::styled(
+                    "Arrows",
+                    Style::default().fg(Color::Blue).bold(),
+                ));
+                controls.push(Span::raw(" Navigate "));
+
+                controls
+            }
         }
     }
 }
@@ -207,35 +232,83 @@ fn render_fullscreen_view(frame: &mut Frame, area: Rect, app_state: &mut AppStat
     }
 }
 
+// Helper function to format file sizes in a human-readable way
+fn format_file_size(size: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if size >= GB {
+        format!("{:.2}GB", size as f64 / GB as f64)
+    } else if size >= MB {
+        format!("{:.2}MB", size as f64 / MB as f64)
+    } else if size >= KB {
+        format!("{:.2}KB", size as f64 / KB as f64)
+    } else {
+        format!("{size}B")
+    }
+}
+
 fn render_fullscreen_launcher_log(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
-    let items: Vec<WListItem> = app_state
-        .log
-        .entries()
-        .iter()
-        .map(|i| match i {
-            Entry::Text(text) => WListItem::new(text),
-            Entry::Downloand(download) => match download.status() {
-                DownloadStatus::InProgress => {
-                    if let Some(total) = download.total() {
-                        WListItem::new_gauge(
-                            "Downloading: ",
-                            (download.current() as f64) / (*total as f64),
-                        )
-                    } else {
-                        WListItem::new(format!("Downloading: {}", download.current()))
-                    }
+    // Build the list of items for the log
+    let mut items: Vec<WListItem> = Vec::new();
+
+    // We'll use entries() from Log which now includes everything
+    items.extend(app_state.log.entries().iter().map(|i| match i {
+        Entry::Text(text) => WListItem::new(text),
+        Entry::Downloand(download) => WListItem::new(format!(
+            "Download: {}",
+            format_file_size(download.current())
+        )),
+        Entry::LauncherUpdate(download) => match download.status() {
+            DownloadStatus::InProgress => {
+                if let Some(total) = download.total() {
+                    WListItem::new_gauge(
+                        format!(
+                            "Launcher update: {} / {} ",
+                            format_file_size(download.current()),
+                            format_file_size(*total)
+                        ),
+                        (download.current() as f64) / (*total as f64),
+                    )
+                } else {
+                    WListItem::new(format!(
+                        "Launcher update: {}",
+                        format_file_size(download.current())
+                    ))
                 }
-                DownloadStatus::Comple => WListItem::new(Line::from(Span::raw(format!(
-                    "Downloaded: {} bytes",
-                    download.current()
-                )))),
-                DownloadStatus::Errored(err) => WListItem::new(format!("Download error: {err}")),
-                DownloadStatus::NotStarted => {
-                    WListItem::new("Download oopsie: something strange happened")
+            }
+            DownloadStatus::Comple => WListItem::new(format!(
+                "Launcher update: {} Downloaded. Restart needed.",
+                format_file_size(download.current())
+            )),
+            DownloadStatus::Errored(err) => WListItem::new(format!("Launcher update error: {err}")),
+        },
+        Entry::GameDownload(download) => match download.status() {
+            DownloadStatus::InProgress => {
+                if let Some(total) = download.total() {
+                    WListItem::new_gauge(
+                        format!(
+                            "Downloading game: {} / {} ",
+                            format_file_size(download.current()),
+                            format_file_size(*total)
+                        ),
+                        (download.current() as f64) / (*total as f64),
+                    )
+                } else {
+                    WListItem::new(format!(
+                        "Downloading game: {}",
+                        format_file_size(download.current())
+                    ))
                 }
-            },
-        })
-        .collect();
+            }
+            DownloadStatus::Comple => WListItem::new(format!(
+                "Game downloaded: {}",
+                format_file_size(download.current())
+            )),
+            DownloadStatus::Errored(err) => WListItem::new(format!("Game download error: {err}")),
+        },
+    }));
 
     let builder = ListBuilder::new(|context| {
         let item = items[context.index].clone();
@@ -243,11 +316,18 @@ fn render_fullscreen_launcher_log(frame: &mut Frame, area: Rect, app_state: &mut
         (item, main_axis_size)
     });
 
+    // Define border style based on focus
+    let launcher_log_border_style = if app_state.focused_log == FocusedLog::LauncherLog {
+        Style::default().fg(Color::Green)
+    } else {
+        Style::default()
+    };
+
     let title = Line::from(" Launcher log (FULLSCREEN) ".bold());
     let block = Block::bordered()
         .title(title.centered())
         .border_set(border::THICK)
-        .border_style(Style::default().fg(Color::Green));
+        .border_style(launcher_log_border_style);
 
     let list = ListView::new(builder, items.len()).block(block);
     frame.render_stateful_widget(list, area, &mut app_state.list_state);
@@ -315,34 +395,65 @@ fn render_normal_view(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
 }
 
 fn render_launcher_log(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
-    let items: Vec<WListItem> = app_state
-        .log
-        .entries()
-        .iter()
-        .map(|i| match i {
-            Entry::Text(text) => WListItem::new(text),
-            Entry::Downloand(download) => match download.status() {
-                DownloadStatus::InProgress => {
-                    if let Some(total) = download.total() {
-                        WListItem::new_gauge(
-                            "Downloading: ",
-                            (download.current() as f64) / (*total as f64),
-                        )
-                    } else {
-                        WListItem::new(format!("Downloading: {}", download.current()))
-                    }
+    // Build the list of items for the log
+    let mut items: Vec<WListItem> = Vec::new();
+
+    // We'll use entries() from Log which now includes everything
+    items.extend(app_state.log.entries().iter().map(|i| match i {
+        Entry::Text(text) => WListItem::new(text),
+        Entry::Downloand(download) => WListItem::new(format!(
+            "Download: {}",
+            format_file_size(download.current())
+        )),
+        Entry::LauncherUpdate(download) => match download.status() {
+            DownloadStatus::InProgress => {
+                if let Some(total) = download.total() {
+                    WListItem::new_gauge(
+                        format!(
+                            "Launcher update: {} / {} ",
+                            format_file_size(download.current()),
+                            format_file_size(*total)
+                        ),
+                        (download.current() as f64) / (*total as f64),
+                    )
+                } else {
+                    WListItem::new(format!(
+                        "Launcher update: {}",
+                        format_file_size(download.current())
+                    ))
                 }
-                DownloadStatus::Comple => WListItem::new(Line::from(Span::raw(format!(
-                    "Downloaded: {} bytes",
-                    download.current()
-                )))),
-                DownloadStatus::Errored(err) => WListItem::new(format!("Download error: {err}")),
-                DownloadStatus::NotStarted => {
-                    WListItem::new("Download oopsie: something strange happened")
+            }
+            DownloadStatus::Comple => WListItem::new(format!(
+                "Launcher update: {} Downloaded. Restart needed.",
+                format_file_size(download.current())
+            )),
+            DownloadStatus::Errored(err) => WListItem::new(format!("Launcher update error: {err}")),
+        },
+        Entry::GameDownload(download) => match download.status() {
+            DownloadStatus::InProgress => {
+                if let Some(total) = download.total() {
+                    WListItem::new_gauge(
+                        format!(
+                            "Downloading game: {} / {} ",
+                            format_file_size(download.current()),
+                            format_file_size(*total)
+                        ),
+                        (download.current() as f64) / (*total as f64),
+                    )
+                } else {
+                    WListItem::new(format!(
+                        "Downloading game: {}",
+                        format_file_size(download.current())
+                    ))
                 }
-            },
-        })
-        .collect();
+            }
+            DownloadStatus::Comple => WListItem::new(format!(
+                "Game downloaded: {}",
+                format_file_size(download.current())
+            )),
+            DownloadStatus::Errored(err) => WListItem::new(format!("Game download error: {err}")),
+        },
+    }));
 
     let builder = ListBuilder::new(|context| {
         let item = items[context.index].clone();

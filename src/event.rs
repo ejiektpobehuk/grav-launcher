@@ -26,4 +26,15 @@ pub enum Event {
     GameOutput(String),
     GameErrorOutput(String),
     LauncherError(String),
+    // Launcher update events
+    CheckingForLauncherUpdate,
+    LauncherUpdateAvailable(String),
+    LauncherNoUpdateAvailable,
+    StartDownloadingLauncherUpdate,
+    LauncherDownloadProgress(FileSize, Option<FileSize>),
+    LauncherUpdateDownloaded,
+    LauncherUpdateReady,
+    LauncherApplyingUpdate,
+    LauncherUpdateApplied,
+    RequestLauncherUpdate,
 }

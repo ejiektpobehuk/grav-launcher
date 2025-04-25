@@ -501,6 +501,7 @@ dependencies = [
  "gilrs",
  "ratatui",
  "reqwest",
+ "serde",
  "sha2",
  "throbber-widgets-tui",
  "tui-widget-list",

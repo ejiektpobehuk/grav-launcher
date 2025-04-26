@@ -289,58 +289,58 @@ fn render_fullscreen_launcher_log(frame: &mut Frame, area: Rect, app_state: &mut
 
     // We'll use entries() from Log which now includes everything
     items.extend(app_state.log.entries().iter().map(|i| match i {
-        Entry::Text(text) => WListItem::new(text),
-        Entry::Downloand(download) => WListItem::new(format!(
-            "Download: {}",
-            format_file_size(download.current())
-        )),
+        Entry::Text(title_opt, text) => match title_opt {
+            Some(title) => WListItem::with_title(title, text),
+            None => WListItem::new(text),
+        },
+        Entry::Downloand(download) => {
+            WListItem::with_title("Download", format_file_size(download.current()))
+        }
         Entry::LauncherUpdate(download) => match download.status() {
             DownloadStatus::InProgress => {
                 if let Some(total) = download.total() {
                     WListItem::new_gauge(
+                        "Launcher update",
                         format!(
-                            "Launcher update: {} / {} ",
+                            "{} / {}",
                             format_file_size(download.current()),
                             format_file_size(*total)
                         ),
                         (download.current() as f64) / (*total as f64),
                     )
                 } else {
-                    WListItem::new(format!(
-                        "Launcher update: {}",
-                        format_file_size(download.current())
-                    ))
+                    WListItem::with_title("Launcher update", format_file_size(download.current()))
                 }
             }
-            DownloadStatus::Comple => WListItem::new(format!(
-                "Launcher update: {} Downloaded. Restart needed.",
-                format_file_size(download.current())
-            )),
-            DownloadStatus::Errored(err) => WListItem::new(format!("Launcher update error: {err}")),
+            DownloadStatus::Comple => WListItem::with_title(
+                "Launcher update",
+                format!(
+                    "{} Downloaded. Restart needed.",
+                    format_file_size(download.current())
+                ),
+            ),
+            DownloadStatus::Errored(err) => WListItem::with_title("Launcher update error", err),
         },
         Entry::GameDownload(download) => match download.status() {
             DownloadStatus::InProgress => {
                 if let Some(total) = download.total() {
                     WListItem::new_gauge(
+                        "Downloading game",
                         format!(
-                            "Downloading game: {} / {} ",
+                            "{} / {}",
                             format_file_size(download.current()),
                             format_file_size(*total)
                         ),
                         (download.current() as f64) / (*total as f64),
                     )
                 } else {
-                    WListItem::new(format!(
-                        "Downloading game: {}",
-                        format_file_size(download.current())
-                    ))
+                    WListItem::with_title("Downloading game", format_file_size(download.current()))
                 }
             }
-            DownloadStatus::Comple => WListItem::new(format!(
-                "Game downloaded: {}",
-                format_file_size(download.current())
-            )),
-            DownloadStatus::Errored(err) => WListItem::new(format!("Game download error: {err}")),
+            DownloadStatus::Comple => {
+                WListItem::with_title("Game downloaded", format_file_size(download.current()))
+            }
+            DownloadStatus::Errored(err) => WListItem::with_title("Game download error", err),
         },
     }));
 
@@ -434,58 +434,58 @@ fn render_launcher_log(frame: &mut Frame, area: Rect, app_state: &mut AppState) 
 
     // We'll use entries() from Log which now includes everything
     items.extend(app_state.log.entries().iter().map(|i| match i {
-        Entry::Text(text) => WListItem::new(text),
-        Entry::Downloand(download) => WListItem::new(format!(
-            "Download: {}",
-            format_file_size(download.current())
-        )),
+        Entry::Text(title_opt, text) => match title_opt {
+            Some(title) => WListItem::with_title(title, text),
+            None => WListItem::new(text),
+        },
+        Entry::Downloand(download) => {
+            WListItem::with_title("Download", format_file_size(download.current()))
+        }
         Entry::LauncherUpdate(download) => match download.status() {
             DownloadStatus::InProgress => {
                 if let Some(total) = download.total() {
                     WListItem::new_gauge(
+                        "Launcher update",
                         format!(
-                            "Launcher update: {} / {} ",
+                            "{} / {}",
                             format_file_size(download.current()),
                             format_file_size(*total)
                         ),
                         (download.current() as f64) / (*total as f64),
                     )
                 } else {
-                    WListItem::new(format!(
-                        "Launcher update: {}",
-                        format_file_size(download.current())
-                    ))
+                    WListItem::with_title("Launcher update", format_file_size(download.current()))
                 }
             }
-            DownloadStatus::Comple => WListItem::new(format!(
-                "Launcher update: {} Downloaded. Restart needed.",
-                format_file_size(download.current())
-            )),
-            DownloadStatus::Errored(err) => WListItem::new(format!("Launcher update error: {err}")),
+            DownloadStatus::Comple => WListItem::with_title(
+                "Launcher update",
+                format!(
+                    "{} Downloaded. Restart needed.",
+                    format_file_size(download.current())
+                ),
+            ),
+            DownloadStatus::Errored(err) => WListItem::with_title("Launcher update error", err),
         },
         Entry::GameDownload(download) => match download.status() {
             DownloadStatus::InProgress => {
                 if let Some(total) = download.total() {
                     WListItem::new_gauge(
+                        "Downloading game",
                         format!(
-                            "Downloading game: {} / {} ",
+                            "{} / {}",
                             format_file_size(download.current()),
                             format_file_size(*total)
                         ),
                         (download.current() as f64) / (*total as f64),
                     )
                 } else {
-                    WListItem::new(format!(
-                        "Downloading game: {}",
-                        format_file_size(download.current())
-                    ))
+                    WListItem::with_title("Downloading game", format_file_size(download.current()))
                 }
             }
-            DownloadStatus::Comple => WListItem::new(format!(
-                "Game downloaded: {}",
-                format_file_size(download.current())
-            )),
-            DownloadStatus::Errored(err) => WListItem::new(format!("Game download error: {err}")),
+            DownloadStatus::Comple => {
+                WListItem::with_title("Game downloaded", format_file_size(download.current()))
+            }
+            DownloadStatus::Errored(err) => WListItem::with_title("Game download error", err),
         },
     }));
 

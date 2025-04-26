@@ -17,4 +17,5 @@ serde = { version = "1.0.196", features = ["derive"] }
 sha2 = "0.10.8"
 throbber-widgets-tui = "0.8.0"
 tui-widget-list = "0.13.2"
+unicode-width = "0.2.0"
 xdg = "2.5.2"

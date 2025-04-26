@@ -177,13 +177,14 @@ fn handle_system_event(app_state: &mut AppState, tx: &mpsc::Sender<Event>, event
         }
         Event::HashAreEqual(eq) => {
             if eq {
-                app_state
-                    .log
-                    .push("Hashes are the same: You have the latest version of the game. ".into());
+                app_state.log.add_titled(
+                    "Hashes are the same",
+                    "You have the latest version of the game.",
+                );
             } else {
                 app_state
                     .log
-                    .push("Hashes are different: There is a newer version.".into());
+                    .add_titled("Hashes are different", "There is a newer version.");
             }
         }
         Event::StartDownloadingBinary(total_download_size) => {
@@ -199,16 +200,14 @@ fn handle_system_event(app_state: &mut AppState, tx: &mpsc::Sender<Event>, event
             app_state.log.set_download_error(err);
         }
         Event::NoLocalBinaryFound => {
-            app_state
-                .log
-                .push("Local game binary not found".to_string());
+            app_state.log.add_text("Local game binary not found");
         }
         Event::GameBinaryUpdated => {}
         Event::Launching => {
-            app_state.log.push("Launching the game...".to_string());
+            app_state.log.add_text("Launching the game...");
         }
         Event::GameExecutionError(err) => {
-            app_state.log.push(format!("Game execution error: {err}"));
+            app_state.log.add_titled("Execution error", err);
         }
         Event::GameOutput(stdout) => {
             app_state.game_stdout.push(stdout);
@@ -217,27 +216,25 @@ fn handle_system_event(app_state: &mut AppState, tx: &mpsc::Sender<Event>, event
             app_state.game_stderr.push(stderr);
         }
         Event::LauncherError(err) => {
-            app_state.log.push(format!("Error: {err}"));
+            app_state.log.add_titled("Error", err);
         }
         // Launcher update events
         Event::CheckingForLauncherUpdate => {
-            app_state.log.launcher_status_msg =
-                Some("Launcher: checking for a newer version".into());
+            app_state.log.launcher_status_msg = Some("checking for a newer version".into());
         }
         Event::LauncherUpdateAvailable(version) => {
             // Get the current version from our crate
             let current_version = crate::VERSION;
             app_state.log.launcher_status_msg = Some(format!(
-                "Launcher: an update is available {current_version} -> {version}"
+                "an update is available {current_version} -> {version}"
             ));
             app_state.launcher_update_available = Some(version);
         }
         Event::LauncherNoUpdateAvailable => {
             // Include the current version in the status message
             let current_version = crate::VERSION;
-            app_state.log.launcher_status_msg = Some(format!(
-                "Launcher: already at the latest version - {current_version}"
-            ));
+            app_state.log.launcher_status_msg =
+                Some(format!("already at the latest version - {current_version}"));
         }
         Event::StartDownloadingLauncherUpdate => {
             // Create a download entry specifically for the launcher update
@@ -260,15 +257,14 @@ fn handle_system_event(app_state: &mut AppState, tx: &mpsc::Sender<Event>, event
             }
         }
         Event::LauncherUpdateReady => {
-            app_state.log.launcher_status_msg =
-                Some("Launcher: update ready, restart to apply".into());
+            app_state.log.launcher_status_msg = Some("update ready, restart to apply".into());
         }
         Event::LauncherApplyingUpdate => {
-            app_state.log.launcher_status_msg = Some("Launcher: applying update...".into());
+            app_state.log.launcher_status_msg = Some("applying update...".into());
         }
         Event::LauncherUpdateApplied => {
             app_state.log.launcher_status_msg =
-                Some("Launcher: update applied. Please restart the launcher.".into());
+                Some("update applied. Please restart the launcher.".into());
         }
         Event::RequestLauncherUpdate => {
             // Start the update process if an update is available and not already in progress

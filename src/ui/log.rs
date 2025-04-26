@@ -18,23 +18,50 @@ impl Log {
             extra_log: Vec::new(),
         }
     }
-    pub fn push(&mut self, string: String) {
-        self.extra_log.push(string);
+
+    // Add a titled entry to the log
+    pub fn add_titled<T: Into<String>, U: Into<String>>(&mut self, title: T, text: U) {
+        self.push(Entry::titled_text(title, text));
     }
+
+    // Add a simple text entry to the log
+    pub fn add_text<T: Into<String>>(&mut self, text: T) {
+        self.push_text(text.into());
+    }
+
+    fn push(&mut self, entry: Entry) {
+        // Store the raw string in extra_log
+        match entry {
+            Entry::Text(Some(title), text) => {
+                self.extra_log.push(format!("{title}: {text}"));
+            }
+            Entry::Text(None, text) => {
+                self.extra_log.push(text);
+            }
+            // Other entry types shouldn't go into extra_log directly
+            _ => {}
+        }
+    }
+
+    // Add a convenience method for pushing simple text
+    fn push_text(&mut self, text: String) {
+        self.extra_log.push(text);
+    }
+
     pub fn entries(&self) -> Vec<Entry> {
         let mut accumulator: Vec<Entry> = Vec::new();
 
         // Add launcher status message if present
         if let Some(status) = &self.launcher_status_msg {
-            accumulator.push(status.clone().into());
+            accumulator.push(Entry::titled_text("Launcher Status", status.clone()));
         }
 
         // Add hash information
         if let Some(remote_hash) = &self.remote_hash_msg {
-            accumulator.push(format!("Remote hash: {remote_hash}").into());
+            accumulator.push(Entry::titled_text("Remote hash", remote_hash.clone()));
         }
         if let Some(local_hash) = &self.local_hash_msg {
-            accumulator.push(format!("Local hash:  {local_hash}").into());
+            accumulator.push(Entry::titled_text("Local hash", local_hash.clone()));
         }
 
         // Add launcher update download status if present
@@ -54,7 +81,7 @@ impl Log {
         accumulator.append(
             &mut extra_log_clone
                 .iter()
-                .map(std::convert::Into::into)
+                .map(Entry::text)
                 .collect(),
         );
         accumulator
@@ -80,7 +107,7 @@ impl Log {
 }
 
 pub enum Entry {
-    Text(String),
+    Text(Option<String>, String), // Optional title, text content
     Downloand(Download),
     LauncherUpdate(Download),
     GameDownload(Download),
@@ -88,17 +115,30 @@ pub enum Entry {
 
 impl From<String> for Entry {
     fn from(text: String) -> Self {
-        Self::Text(text)
+        Self::Text(None, text)
     }
 }
+
 impl From<&String> for Entry {
     fn from(text: &String) -> Self {
-        Self::Text(text.clone())
+        Self::Text(None, text.clone())
     }
 }
+
 impl From<Download> for Entry {
     fn from(download: Download) -> Self {
         Self::Downloand(download)
+    }
+}
+
+// Helper functions for creating entries
+impl Entry {
+    pub fn titled_text<T: Into<String>, U: Into<String>>(title: T, text: U) -> Self {
+        Self::Text(Some(title.into()), text.into())
+    }
+
+    pub fn text<T: Into<String>>(text: T) -> Self {
+        Self::Text(None, text.into())
     }
 }
 

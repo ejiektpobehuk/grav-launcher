@@ -505,6 +505,7 @@ dependencies = [
  "sha2",
  "throbber-widgets-tui",
  "tui-widget-list",
+ "unicode-width 0.2.0",
  "xdg",
 ]
 

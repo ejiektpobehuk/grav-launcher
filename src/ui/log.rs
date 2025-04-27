@@ -78,12 +78,7 @@ impl Log {
 
         // Add all other log entries
         let extra_log_clone = self.extra_log.clone();
-        accumulator.append(
-            &mut extra_log_clone
-                .iter()
-                .map(Entry::text)
-                .collect(),
-        );
+        accumulator.append(&mut extra_log_clone.iter().map(Entry::text).collect());
         accumulator
     }
     pub fn start_download(&mut self, total: Option<u64>) {

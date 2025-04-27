@@ -8,7 +8,11 @@ use ratatui::prelude::*;
 use std::sync::mpsc;
 use std::thread;
 
-pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>, tx: mpsc::Sender<Event>) -> Result<()> {
+pub fn run(
+    terminal: &mut Terminal<impl Backend>,
+    rx: &mpsc::Receiver<Event>,
+    tx: mpsc::Sender<Event>,
+) -> Result<()> {
     let mut app_state = AppState::init();
 
     loop {

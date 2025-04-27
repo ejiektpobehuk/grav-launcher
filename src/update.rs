@@ -157,58 +157,21 @@ pub fn update_launcher(version: &str, tx: &mpsc::Sender<Event>) -> Result<()> {
         ));
     }
 
-    // Notify UI that the update is ready to apply
-    if tx.send(Event::LauncherUpdateReady).is_err() {
-        return Err(eyre!("Channel disconnected after launcher update prepared"));
-    }
-
-    Ok(())
-}
-
-/// Apply the update by replacing the current executable
-pub fn apply_update(tx: &mpsc::Sender<Event>) -> Result<()> {
-    // Check if there's a pending update
-    let current_exe = env::current_exe().wrap_err("Failed to get current executable path")?;
-
-    // Look for temporary update files that match our pattern: grav-launcher.v*.new
-    let exe_dir = current_exe
-        .parent()
-        .ok_or_else(|| eyre!("Couldn't get parent directory of executable"))?;
-    let entries = fs::read_dir(exe_dir).wrap_err("Failed to read executable directory")?;
-
-    // Find update files
-    let mut update_file = None;
-    for entry in entries.flatten() {
-        let file_name = entry.file_name();
-        let file_name_str = file_name.to_string_lossy();
-
-        // Check if this is an update file
-        if file_name_str.starts_with("grav-launcher.") && file_name_str.ends_with(".new") {
-            update_file = Some(entry.path());
-            break;
-        }
-    }
-
-    // If no update file is found, exit
-    let Some(update_path) = update_file else {
-        return Ok(());
-    };
-
     // Notify UI that update is being applied
     if tx.send(Event::LauncherApplyingUpdate).is_err() {
         return Err(eyre!("Channel disconnected when applying launcher update"));
     }
 
     // Replace the executable - on Unix systems, we can do this while the program is running
-    fs::rename(&update_path, &current_exe).wrap_err_with(|| {
+    fs::rename(&temp_path, &current_exe).wrap_err_with(|| {
         format!(
             "Failed to replace executable: {} -> {}",
-            update_path.display(),
+            temp_path.display(),
             current_exe.display()
         )
     })?;
 
-    // Notify the user that they need to restart the application
+    // Notify the user that the update was applied
     if tx.send(Event::LauncherUpdateApplied).is_err() {
         return Err(eyre!(
             "Channel disconnected when notifying about successful update"

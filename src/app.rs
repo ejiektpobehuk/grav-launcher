@@ -8,9 +8,8 @@ use ratatui::prelude::*;
 use std::sync::mpsc;
 use std::thread;
 
-pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>) -> Result<()> {
+pub fn run(terminal: &mut Terminal<impl Backend>, rx: &mpsc::Receiver<Event>, tx: mpsc::Sender<Event>) -> Result<()> {
     let mut app_state = AppState::init();
-    let (tx, _rx) = mpsc::channel();
 
     loop {
         terminal.draw(|frame| draw(frame, &mut app_state))?;
@@ -255,9 +254,6 @@ fn handle_system_event(app_state: &mut AppState, tx: &mpsc::Sender<Event>, event
             if let Some(download) = &mut app_state.log.launcher_update {
                 download.mark_complete();
             }
-        }
-        Event::LauncherUpdateReady => {
-            app_state.log.launcher_status_msg = Some("update ready, restart to apply".into());
         }
         Event::LauncherApplyingUpdate => {
             app_state.log.launcher_status_msg = Some("applying update...".into());

@@ -56,18 +56,18 @@ impl Log {
             accumulator.push(Entry::titled_text("Launcher Status", status.clone()));
         }
 
+        // Add launcher update download status if present
+        if let Some(launcher_update) = &self.launcher_update {
+            // Create a special LauncherUpdate entry for formatting
+            accumulator.push(Entry::LauncherUpdate(launcher_update.clone()));
+        }
+
         // Add hash information
         if let Some(remote_hash) = &self.remote_hash_msg {
             accumulator.push(Entry::titled_text("Remote hash", remote_hash.clone()));
         }
         if let Some(local_hash) = &self.local_hash_msg {
             accumulator.push(Entry::titled_text("Local hash", local_hash.clone()));
-        }
-
-        // Add launcher update download status if present
-        if let Some(launcher_update) = &self.launcher_update {
-            // Create a special LauncherUpdate entry for formatting
-            accumulator.push(Entry::LauncherUpdate(launcher_update.clone()));
         }
 
         // Add game download status if present

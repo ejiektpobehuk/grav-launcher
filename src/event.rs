@@ -33,7 +33,6 @@ pub enum Event {
     StartDownloadingLauncherUpdate,
     LauncherDownloadProgress(FileSize, Option<FileSize>),
     LauncherUpdateDownloaded,
-    LauncherUpdateReady,
     LauncherApplyingUpdate,
     LauncherUpdateApplied,
     RequestLauncherUpdate,

@@ -52,11 +52,6 @@ fn main() -> Result<()> {
     // Check for launcher update
     let update_tx = tx.clone();
     thread::spawn(move || {
-        // Check if there's a pending update to apply
-        if let Err(e) = update::apply_update(&update_tx) {
-            let _ = update_tx.send(Event::LauncherError(format!("Error applying update: {e}")));
-        }
-
         // Check for new updates
         let _ = update_tx.send(Event::CheckingForLauncherUpdate);
         match update::check_for_update(VERSION) {
@@ -74,9 +69,10 @@ fn main() -> Result<()> {
         }
     });
 
-    let thread_join_handle = thread::spawn(move || launcher::launcher_logic(tx));
+    let launcher_tx = tx.clone();
+    let thread_join_handle = thread::spawn(move || launcher::launcher_logic(launcher_tx));
 
-    let app_result = app::run(&mut terminal, &rx);
+    let app_result = app::run(&mut terminal, &rx, tx);
 
     // Cleanup
     disable_focus_reporting()?;

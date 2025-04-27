@@ -20,23 +20,24 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libudev-dev
 
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Lint with Clippy
+        run: cargo clippy --all-features -- -D warnings
+
       - name: Build (release)
         run: cargo build --release
 
-      - name: Generate release notes
-        id: notes
-        uses: release-drafter/release-drafter@v5
-        with:
-          config-name: release-drafter.yml
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run tests
+        run: cargo test --all --verbose
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          body: |
-            See the changelog for details.
           files: target/release/grav-launcher
+          draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

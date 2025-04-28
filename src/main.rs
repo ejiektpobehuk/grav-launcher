@@ -4,7 +4,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use color_eyre::Result;
-use gilrs::{EventType, Gilrs};
+use gilrs::{Axis, EventType, Gilrs};
 
 use crossterm::event as terminal_event;
 use crossterm::event::Event as CrosstermEvent;
@@ -142,16 +142,74 @@ fn controller_input_handling(tx: mpsc::Sender<Event>) {
             }
         };
 
+        // Define threshold values for the stick movement hysteresis
+        const HIGH_THRESHOLD: f32 = 0.5; // Consider triggered when exceeding this value
+        const LOW_THRESHOLD: f32 = 0.2; // Must return below this value to reset
+
+        // Track the "triggered" state of each direction
+        let mut left_triggered = false;
+        let mut right_triggered = false;
+        let mut up_triggered = false;
+        let mut down_triggered = false;
+
         loop {
             // Process controller events
             while let Some(gilrs_event) = gilrs.next_event() {
-                if let EventType::ButtonPressed(button, _) = gilrs_event.event {
-                    if tx.send(Event::ControllerInput(button)).is_err() {
-                        eprintln!(
-                            "Controller event receiver disconnected, shutting down controller thread"
-                        );
-                        return;
+                match gilrs_event.event {
+                    EventType::ButtonPressed(button, _) => {
+                        if tx.send(Event::ControllerInput(button)).is_err() {
+                            eprintln!(
+                                "Controller event receiver disconnected, shutting down controller thread"
+                            );
+                            return;
+                        }
                     }
+                    EventType::AxisChanged(axis, value, _) => {
+                        match axis {
+                            Axis::LeftStickX => {
+                                // Handle horizontal stick movement
+                                if value > HIGH_THRESHOLD && !right_triggered {
+                                    // Right movement crossing high threshold
+                                    right_triggered = true;
+                                    if tx.send(Event::ControllerAxisMoved(axis, value)).is_err() {
+                                        return;
+                                    }
+                                } else if value < -HIGH_THRESHOLD && !left_triggered {
+                                    // Left movement crossing high threshold
+                                    left_triggered = true;
+                                    if tx.send(Event::ControllerAxisMoved(axis, value)).is_err() {
+                                        return;
+                                    }
+                                } else if value.abs() < LOW_THRESHOLD {
+                                    // Reset triggered state when returning to neutral
+                                    left_triggered = false;
+                                    right_triggered = false;
+                                }
+                            }
+                            Axis::LeftStickY => {
+                                // Handle vertical stick movement
+                                if value > HIGH_THRESHOLD && !down_triggered {
+                                    // Down movement crossing high threshold
+                                    down_triggered = true;
+                                    if tx.send(Event::ControllerAxisMoved(axis, value)).is_err() {
+                                        return;
+                                    }
+                                } else if value < -HIGH_THRESHOLD && !up_triggered {
+                                    // Up movement crossing high threshold
+                                    up_triggered = true;
+                                    if tx.send(Event::ControllerAxisMoved(axis, value)).is_err() {
+                                        return;
+                                    }
+                                } else if value.abs() < LOW_THRESHOLD {
+                                    // Reset triggered state when returning to neutral
+                                    up_triggered = false;
+                                    down_triggered = false;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
                 }
             }
 

@@ -3,7 +3,7 @@ use crate::ui::draw;
 use crate::ui::{AppState, DisplayMode, ExitPopupState, TerminalFocus, UpdateStatus};
 use color_eyre::Result;
 use crossterm::event::KeyCode;
-use gilrs::Button;
+use gilrs::{Axis,Button};
 use ratatui::prelude::*;
 use std::sync::mpsc;
 use std::thread;
@@ -30,6 +30,12 @@ pub fn run(
                     && handle_controller_input(&mut app_state, &tx, button)
                 {
                     break;
+                }
+            }
+            Event::ControllerAxisMoved(axis, value) => {
+                app_state.controller_input_used();
+                if app_state.terminal_focus == TerminalFocus::Focused {
+                    handle_controller_axis(&mut app_state, axis, value);
                 }
             }
             Event::TerminalFocusChanged(focused) => {
@@ -157,6 +163,44 @@ fn handle_controller_input(
         }
     }
     false
+}
+
+/// Handle controller analog stick movement
+fn handle_controller_axis(app_state: &mut AppState, axis: gilrs::Axis, value: f32) {
+    // Only handle axis events when not in exit popup and based on app display mode
+    if app_state.exit_popup == ExitPopupState::Visible {
+        return;
+    }
+
+    match axis {
+        Axis::LeftStickX => {
+            if value > 0.0 {
+                // Right movement
+                if app_state.display_mode != DisplayMode::Fullscreen {
+                    app_state.next_log();
+                }
+            } else {
+                // Left movement
+                if app_state.display_mode != DisplayMode::Fullscreen {
+                    app_state.prev_log();
+                }
+            }
+        }
+        Axis::LeftStickY => {
+            if value > 0.0 {
+                // Up movement
+                if app_state.display_mode != DisplayMode::Fullscreen {
+                    app_state.prev_log();
+                }
+            } else {
+                // Down movement
+                if app_state.display_mode != DisplayMode::Fullscreen {
+                    app_state.next_log();
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
 /// Handle system events like hashing, downloads, and game execution

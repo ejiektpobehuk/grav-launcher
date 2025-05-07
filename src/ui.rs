@@ -276,54 +276,60 @@ fn get_help_text(app_state: &AppState) -> Vec<Span> {
         // Add controls based on input method
         match app_state.input_method {
             InputMethod::Controller => {
-                let mut controls = vec![
-                    Span::styled(" A", Style::default().fg(Color::Green).bold()),
-                    Span::raw(" Fullscreen | "),
-                    Span::styled("B", Style::default().fg(Color::Red).bold()),
-                    Span::raw(" Exit"),
-                ];
+                let mut controls = Vec::new();
 
                 // Only show update hint if an update is available and not already in progress
                 if app_state.launcher_update_available.is_some()
                     && app_state.update_status == UpdateStatus::NotRequested
                 {
-                    controls.push(Span::raw(" | "));
+                    controls.push(Span::raw(" "));
                     controls.push(Span::styled("Y", Style::default().fg(Color::Yellow).bold()));
                     controls.push(Span::raw(" Update"));
+                    controls.push(Span::raw(" |"));
                 }
 
-                controls.push(Span::raw(" | "));
+                controls.push(Span::raw(" "));
                 controls.push(Span::styled(
                     "D-Pad",
                     Style::default().fg(Color::Yellow).bold(),
                 ));
-                controls.push(Span::raw(" Navigate "));
+                controls.push(Span::raw(" Navigate |"));
+
+                controls.push(Span::styled(" A", Style::default().fg(Color::Green).bold()));
+                controls.push(Span::raw(" Fullscreen | "));
+                controls.push(Span::styled("B", Style::default().fg(Color::Red).bold()));
+                controls.push(Span::raw(" Exit "));
 
                 controls
             }
             InputMethod::Keyboard => {
-                let mut controls = vec![
-                    Span::styled(" Enter", Style::default().fg(Color::Blue).bold()),
-                    Span::raw(" Fullscreen | "),
-                    Span::styled("Esc", Style::default().fg(Color::Blue).bold()),
-                    Span::raw(" Exit"),
-                ];
+                let mut controls = Vec::new();
 
                 // Only show update hint if an update is available and not already in progress
                 if app_state.launcher_update_available.is_some()
                     && app_state.update_status == UpdateStatus::NotRequested
                 {
-                    controls.push(Span::raw(" | "));
+                    controls.push(Span::raw(" "));
                     controls.push(Span::styled("u", Style::default().fg(Color::Yellow).bold()));
                     controls.push(Span::raw(" Update"));
+                    controls.push(Span::raw(" |"));
                 }
 
-                controls.push(Span::raw(" | "));
+                controls.push(Span::raw(" "));
                 controls.push(Span::styled(
                     "Arrows",
                     Style::default().fg(Color::Blue).bold(),
                 ));
-                controls.push(Span::raw(" Navigate "));
+                controls.push(Span::raw(" Navigate |"));
+
+                // Then add other controls
+                controls.push(Span::styled(
+                    " Enter",
+                    Style::default().fg(Color::Blue).bold(),
+                ));
+                controls.push(Span::raw(" Fullscreen | "));
+                controls.push(Span::styled("Esc", Style::default().fg(Color::Blue).bold()));
+                controls.push(Span::raw(" Exit "));
 
                 controls
             }

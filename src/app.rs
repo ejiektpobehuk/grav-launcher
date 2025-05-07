@@ -146,6 +146,13 @@ fn handle_controller_input(
             Button::DPadDown => {
                 app_state.scroll_down();
             }
+            // Shoulder buttons for log navigation in fullscreen mode
+            Button::LeftTrigger | Button::LeftTrigger2 => {
+                app_state.prev_log();
+            }
+            Button::RightTrigger | Button::RightTrigger2 => {
+                app_state.next_log();
+            }
             _ => {}
         }
     } else {
@@ -174,6 +181,13 @@ fn handle_controller_input(
             }
             Button::DPadLeft | Button::DPadUp => {
                 app_state.prev_log();
+            }
+            // Shoulder buttons for log navigation
+            Button::LeftTrigger | Button::LeftTrigger2 => {
+                app_state.prev_log();
+            }
+            Button::RightTrigger | Button::RightTrigger2 => {
+                app_state.next_log();
             }
             _ => {}
         }

@@ -190,7 +190,7 @@ fn handle_controller_axis(app_state: &mut AppState, axis: gilrs::Axis, value: f3
 
     match axis {
         Axis::LeftStickX => {
-            if let DisplayMode::Fullscreen(_) = app_state.display_mode {
+            if app_state.display_mode == DisplayMode::Normal {
                 if value > 0.0 {
                     // Right movement
                     app_state.next_log();

@@ -4,8 +4,14 @@ default:
 clippy:
     cargo clippy -- -W clippy::pedantic -W clippy::nursery -W clippy::unwrap_used
 
+clippy-fix:
+    cargo clippy --fix -- -W clippy::pedantic -W clippy::nursery -W clippy::unwrap_used
+
 nix-clippy:
     nix develop --command bash -c 'cargo clippy -- -W clippy::pedantic -W clippy::nursery -W clippy::unwrap_used'
+
+nix-clippy-fix:
+    nix develop --command bash -c 'cargo clippy --fix -- -W clippy::pedantic -W clippy::nursery -W clippy::unwrap_used'
 
 nix-build:
     nix develop --command bash -c 'cargo build'

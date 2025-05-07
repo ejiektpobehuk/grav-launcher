@@ -95,7 +95,7 @@ fn handle_keyboard_input(app_state: &mut AppState, tx: &mpsc::Sender<Event>, key
             KeyCode::Right | KeyCode::Down | KeyCode::Char('j') | KeyCode::Tab => {
                 app_state.next_log();
             }
-            KeyCode::Left | KeyCode::Up | KeyCode::Char('k') => {
+            KeyCode::Left | KeyCode::Up | KeyCode::Char('k') | KeyCode::BackTab => {
                 app_state.prev_log();
             }
             // Request launcher update

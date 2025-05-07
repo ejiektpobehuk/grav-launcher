@@ -17,6 +17,7 @@
             # Rust toolchain
             rustc
             cargo
+            clippy
             # DX
             bacon
             just

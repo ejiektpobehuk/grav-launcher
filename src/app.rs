@@ -210,14 +210,12 @@ fn handle_controller_axis(app_state: &mut AppState, axis: gilrs::Axis, value: f3
                     // Down movement
                     app_state.scroll_down();
                 }
+            } else if value > 0.0 {
+                // Up movement
+                app_state.next_log();
             } else {
-                if value > 0.0 {
-                    // Up movement
-                    app_state.next_log();
-                } else {
-                    // Down movement
-                    app_state.prev_log();
-                }
+                // Down movement
+                app_state.prev_log();
             }
         }
         _ => {}

@@ -109,7 +109,7 @@ impl AppState {
         };
     }
 
-    pub fn enter_fullscreen(&mut self, visible_height: usize) {
+    pub const fn enter_fullscreen(&mut self, visible_height: usize) {
         self.display_mode = DisplayMode::Fullscreen(visible_height);
     }
 
@@ -145,7 +145,7 @@ impl AppState {
         self.input_method = InputMethod::Keyboard;
     }
 
-    pub fn scroll_up(&mut self) {
+    pub const fn scroll_up(&mut self) {
         match self.focused_log {
             FocusedLog::GameStdout => {
                 if self.stdout_scroll > 0 {
@@ -194,10 +194,10 @@ pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
     // Render the main UI frame with title and help text
     render_main_frame(frame, area, app_state);
 
-    if app_state.display_mode != DisplayMode::Normal {
-        render_fullscreen_view(frame, area, app_state);
-    } else {
+    if app_state.display_mode == DisplayMode::Normal {
         render_normal_view(frame, area, app_state);
+    } else {
+        render_fullscreen_view(frame, area, app_state);
     }
 
     // Render exit confirmation popup if needed

@@ -3,7 +3,7 @@ use crate::ui::draw;
 use crate::ui::{AppState, DisplayMode, ExitPopupState, TerminalFocus, UpdateStatus};
 use color_eyre::Result;
 use crossterm::event::KeyCode;
-use gilrs::{Axis,Button};
+use gilrs::{Axis, Button};
 use ratatui::prelude::*;
 use std::sync::mpsc;
 use std::thread;
@@ -66,11 +66,17 @@ fn handle_keyboard_input(app_state: &mut AppState, tx: &mpsc::Sender<Event>, key
             }
             _ => {}
         }
-    } else if app_state.display_mode == DisplayMode::Fullscreen {
+    } else if let DisplayMode::Fullscreen(_) = app_state.display_mode {
         // In fullscreen mode, Escape/h/q return to normal view
         match key {
             KeyCode::Esc | KeyCode::Char('h' | 'q') => {
                 app_state.exit_fullscreen();
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                app_state.scroll_up();
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                app_state.scroll_down();
             }
             _ => {}
         }
@@ -83,10 +89,10 @@ fn handle_keyboard_input(app_state: &mut AppState, tx: &mpsc::Sender<Event>, key
             }
             // Enter fullscreen with Enter/l
             KeyCode::Enter | KeyCode::Char('l') => {
-                app_state.enter_fullscreen();
+                app_state.enter_fullscreen(20); // Default visible height, will be updated in draw
             }
             // Navigation with arrow keys and j/k
-            KeyCode::Right | KeyCode::Down | KeyCode::Char('j') => {
+            KeyCode::Right | KeyCode::Down | KeyCode::Char('j') | KeyCode::Tab => {
                 app_state.next_log();
             }
             KeyCode::Left | KeyCode::Up | KeyCode::Char('k') => {
@@ -127,10 +133,20 @@ fn handle_controller_input(
             }
             _ => {}
         }
-    } else if app_state.display_mode == DisplayMode::Fullscreen {
+    } else if let DisplayMode::Fullscreen(_) = app_state.display_mode {
         // In fullscreen mode, East (B) returns to normal view
-        if button == Button::East {
-            app_state.exit_fullscreen();
+        match button {
+            Button::East => {
+                app_state.exit_fullscreen();
+            }
+            // Scrolling only in fullscreen mode
+            Button::DPadUp => {
+                app_state.scroll_up();
+            }
+            Button::DPadDown => {
+                app_state.scroll_down();
+            }
+            _ => {}
         }
     } else {
         // In normal mode
@@ -141,7 +157,7 @@ fn handle_controller_input(
             }
             // Enter fullscreen with South (A) button
             Button::South => {
-                app_state.enter_fullscreen();
+                app_state.enter_fullscreen(20); // Default visible height, will be updated in draw
             }
             // Request launcher update with North (Y) button
             Button::North => {
@@ -153,10 +169,10 @@ fn handle_controller_input(
                 }
             }
             // D-pad navigation
-            _ if button == Button::DPadRight || button == Button::DPadDown => {
+            Button::DPadRight | Button::DPadDown => {
                 app_state.next_log();
             }
-            _ if button == Button::DPadLeft || button == Button::DPadUp => {
+            Button::DPadLeft | Button::DPadUp => {
                 app_state.prev_log();
             }
             _ => {}
@@ -174,28 +190,33 @@ fn handle_controller_axis(app_state: &mut AppState, axis: gilrs::Axis, value: f3
 
     match axis {
         Axis::LeftStickX => {
-            if value > 0.0 {
-                // Right movement
-                if app_state.display_mode != DisplayMode::Fullscreen {
+            if let DisplayMode::Fullscreen(_) = app_state.display_mode {
+                if value > 0.0 {
+                    // Right movement
                     app_state.next_log();
-                }
-            } else {
-                // Left movement
-                if app_state.display_mode != DisplayMode::Fullscreen {
+                } else {
+                    // Left movement
                     app_state.prev_log();
                 }
             }
         }
         Axis::LeftStickY => {
-            if value > 0.0 {
-                // Up movement
-                if app_state.display_mode != DisplayMode::Fullscreen {
-                    app_state.prev_log();
+            // Only handle vertical scrolling in fullscreen mode
+            if let DisplayMode::Fullscreen(_) = app_state.display_mode {
+                if value > 0.0 {
+                    // Up movement
+                    app_state.scroll_up();
+                } else {
+                    // Down movement
+                    app_state.scroll_down();
                 }
             } else {
-                // Down movement
-                if app_state.display_mode != DisplayMode::Fullscreen {
+                if value > 0.0 {
+                    // Up movement
                     app_state.next_log();
+                } else {
+                    // Down movement
+                    app_state.prev_log();
                 }
             }
         }

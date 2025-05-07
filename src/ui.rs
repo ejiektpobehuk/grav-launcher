@@ -8,9 +8,12 @@ use ratatui::{
     Frame,
     prelude::*,
     style::{Color, Style, Stylize},
-    symbols::border,
+    symbols::{border, scrollbar},
     text::Line,
-    widgets::{Block, BorderType, Borders, Clear, List, ListItem, ListState, Paragraph},
+    widgets::{
+        Block, BorderType, Borders, Clear, List, ListItem, ListState, Paragraph, Scrollbar,
+        ScrollbarOrientation, ScrollbarState,
+    },
 };
 use tui_widget_list::{ListBuilder, ListState as WListState, ListView};
 
@@ -30,7 +33,7 @@ pub enum InputMethod {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DisplayMode {
     Normal,
-    Fullscreen,
+    Fullscreen(usize),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,6 +61,8 @@ pub struct AppState {
     pub list_state: WListState,
     pub stdout_state: ListState,
     pub stderr_state: ListState,
+    pub stdout_scroll: usize,
+    pub stderr_scroll: usize,
     pub focused_log: FocusedLog,
     pub display_mode: DisplayMode,
     pub exit_popup: ExitPopupState,
@@ -76,6 +81,8 @@ impl AppState {
             list_state: WListState::default(),
             stdout_state: ListState::default(),
             stderr_state: ListState::default(),
+            stdout_scroll: 0,
+            stderr_scroll: 0,
             focused_log: FocusedLog::LauncherLog,
             display_mode: DisplayMode::Normal,
             exit_popup: ExitPopupState::Hidden,
@@ -102,8 +109,8 @@ impl AppState {
         };
     }
 
-    pub const fn enter_fullscreen(&mut self) {
-        self.display_mode = DisplayMode::Fullscreen;
+    pub fn enter_fullscreen(&mut self, visible_height: usize) {
+        self.display_mode = DisplayMode::Fullscreen(visible_height);
     }
 
     pub const fn exit_fullscreen(&mut self) {
@@ -137,15 +144,57 @@ impl AppState {
     pub const fn keyboard_input_used(&mut self) {
         self.input_method = InputMethod::Keyboard;
     }
+
+    pub fn scroll_up(&mut self) {
+        match self.focused_log {
+            FocusedLog::GameStdout => {
+                if self.stdout_scroll > 0 {
+                    self.stdout_scroll = self.stdout_scroll.saturating_sub(1);
+                }
+            }
+            FocusedLog::GameStderr => {
+                if self.stderr_scroll > 0 {
+                    self.stderr_scroll = self.stderr_scroll.saturating_sub(1);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub fn scroll_down(&mut self) {
+        match self.focused_log {
+            FocusedLog::GameStdout => {
+                let max_scroll = self.game_stdout.len().saturating_sub(1);
+                if self.stdout_scroll < max_scroll {
+                    self.stdout_scroll = self.stdout_scroll.saturating_add(1);
+                }
+            }
+            FocusedLog::GameStderr => {
+                let max_scroll = self.game_stderr.len().saturating_sub(1);
+                if self.stderr_scroll < max_scroll {
+                    self.stderr_scroll = self.stderr_scroll.saturating_add(1);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 pub fn draw(frame: &mut Frame, app_state: &mut AppState) {
     let area = frame.area();
 
+    // Calculate visible height for fullscreen mode
+    let visible_height = area.height.saturating_sub(2) as usize; // Account for borders
+
+    // Update fullscreen mode with current visible height
+    if let DisplayMode::Fullscreen(_) = app_state.display_mode {
+        app_state.enter_fullscreen(visible_height);
+    }
+
     // Render the main UI frame with title and help text
     render_main_frame(frame, area, app_state);
 
-    if app_state.display_mode == DisplayMode::Fullscreen {
+    if app_state.display_mode != DisplayMode::Normal {
         render_fullscreen_view(frame, area, app_state);
     } else {
         render_normal_view(frame, area, app_state);
@@ -173,17 +222,50 @@ fn get_help_text(app_state: &AppState) -> Vec<Span> {
     if app_state.exit_popup == ExitPopupState::Visible {
         // Hide normal controls when popup is shown
         vec![]
-    } else if app_state.display_mode == DisplayMode::Fullscreen {
-        match app_state.input_method {
-            InputMethod::Controller => vec![
-                Span::styled(" B", Style::default().fg(Color::Red).bold()),
-                Span::raw(" Back "),
-            ],
-            InputMethod::Keyboard => vec![
-                Span::styled(" Esc", Style::default().fg(Color::Blue).bold()),
-                Span::raw(" Back "),
-            ],
+    } else if let DisplayMode::Fullscreen(visible_height) = app_state.display_mode {
+        let mut controls = Vec::new();
+
+        // Add scrolling instructions if content is scrollable
+        let is_scrollable = match app_state.focused_log {
+            FocusedLog::LauncherLog => app_state.log.entries().len() > visible_height,
+            FocusedLog::GameStdout => app_state.game_stdout.len() > visible_height,
+            FocusedLog::GameStderr => app_state.game_stderr.len() > visible_height,
+        };
+
+        if is_scrollable {
+            controls.push(Span::raw(" "));
+            match app_state.input_method {
+                InputMethod::Controller => {
+                    controls.push(Span::styled(
+                        "D-Pad Up/Down",
+                        Style::default().fg(Color::Yellow).bold(),
+                    ));
+                    controls.push(Span::raw(" Scroll "));
+                }
+                InputMethod::Keyboard => {
+                    controls.push(Span::styled("↑/↓", Style::default().fg(Color::Blue).bold()));
+                    controls.push(Span::raw(" Scroll "));
+                }
+            }
+            controls.push(Span::raw(" |"));
         }
+
+        // Add back control
+        match app_state.input_method {
+            InputMethod::Controller => {
+                controls.push(Span::styled(" B", Style::default().fg(Color::Red).bold()));
+                controls.push(Span::raw(" Back "));
+            }
+            InputMethod::Keyboard => {
+                controls.push(Span::styled(
+                    " Esc",
+                    Style::default().fg(Color::Blue).bold(),
+                ));
+                controls.push(Span::raw(" Back "));
+            }
+        }
+
+        controls
     } else if app_state.terminal_focus == TerminalFocus::Unfocused {
         vec![
             Span::raw(" Terminal "),
@@ -350,61 +432,133 @@ fn render_fullscreen_launcher_log(frame: &mut Frame, area: Rect, app_state: &mut
         (item, main_axis_size)
     });
 
-    // Define border style based on focus
-    let launcher_log_border_style = if app_state.focused_log == FocusedLog::LauncherLog {
-        Style::default().fg(Color::Green)
-    } else {
-        Style::default()
-    };
-
-    let title = Line::from(" Launcher log (FULLSCREEN) ".bold());
+    let title = Line::from(" Launcher log ".bold());
     let block = Block::bordered()
         .title(title.centered())
-        .border_set(border::THICK)
-        .border_style(launcher_log_border_style);
+        .border_set(border::THICK);
 
     let list = ListView::new(builder, items.len()).block(block);
     frame.render_stateful_widget(list, area, &mut app_state.list_state);
 }
 
 fn render_fullscreen_game_stdout(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
+    let visible_height = area.height.saturating_sub(2) as usize; // Account for borders
+    let total_items = app_state.game_stdout.len();
+
+    // Calculate max scroll position - when last line is visible
+    let max_scroll = if total_items <= visible_height {
+        0
+    } else {
+        total_items.saturating_sub(visible_height)
+    };
+
+    // Ensure scroll position doesn't exceed max
+    app_state.stdout_scroll = app_state.stdout_scroll.min(max_scroll);
+
+    let start_idx = app_state.stdout_scroll;
+    let end_idx = (start_idx + visible_height).min(total_items);
+
     let stdouts: Vec<ListItem> = app_state
         .game_stdout
         .iter()
+        .skip(start_idx)
+        .take(end_idx - start_idx)
         .map(|i| {
             let content = Line::from(Span::raw(i.to_string()));
             ListItem::new(content)
         })
         .collect();
 
-    let title = Line::from(" Game text output (FULLSCREEN) ".bold());
+    let title = Line::from(" Game text output ".bold());
     let block = Block::bordered()
         .title(title.centered())
-        .border_set(border::THICK)
-        .border_style(Style::default().fg(Color::Green));
+        .border_set(border::THICK);
 
     let stdout = List::new(stdouts).block(block);
     frame.render_stateful_widget(stdout, area, &mut app_state.stdout_state);
+
+    // Add scrollbar integrated into the border
+    if total_items > visible_height {
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .symbols(scrollbar::VERTICAL)
+            .begin_symbol(None)
+            .track_symbol(None)
+            .end_symbol(None);
+
+        let mut scrollbar_state = ScrollbarState::default()
+            .content_length(max_scroll + 1) // +1 because we want to include the last position
+            .viewport_content_length(visible_height)
+            .position(start_idx);
+
+        frame.render_stateful_widget(
+            scrollbar,
+            area.inner(Margin {
+                vertical: 1,
+                horizontal: 0,
+            }),
+            &mut scrollbar_state,
+        );
+    }
 }
 
 fn render_fullscreen_game_stderr(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
+    let visible_height = area.height.saturating_sub(2) as usize; // Account for borders
+    let total_items = app_state.game_stderr.len();
+
+    // Calculate max scroll position - when last line is visible
+    let max_scroll = if total_items <= visible_height {
+        0
+    } else {
+        total_items.saturating_sub(visible_height)
+    };
+
+    // Ensure scroll position doesn't exceed max
+    app_state.stderr_scroll = app_state.stderr_scroll.min(max_scroll);
+
+    let start_idx = app_state.stderr_scroll;
+    let end_idx = (start_idx + visible_height).min(total_items);
+
     let stderrs: Vec<ListItem> = app_state
         .game_stderr
         .iter()
+        .skip(start_idx)
+        .take(end_idx - start_idx)
         .map(|i| {
             let content = Line::from(Span::raw(i.to_string()));
             ListItem::new(content)
         })
         .collect();
 
-    let title = Line::from(" Game errors (FULLSCREEN) ".bold());
+    let title = Line::from(" Game errors ".bold());
     let block = Block::bordered()
         .title(title.centered())
-        .border_set(border::THICK)
-        .border_style(Style::default().fg(Color::Green));
+        .border_set(border::THICK);
 
     let stderr = List::new(stderrs).block(block);
     frame.render_stateful_widget(stderr, area, &mut app_state.stderr_state);
+
+    // Add scrollbar integrated into the border
+    if total_items > visible_height {
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .symbols(scrollbar::VERTICAL)
+            .begin_symbol(None)
+            .track_symbol(None)
+            .end_symbol(None);
+
+        let mut scrollbar_state = ScrollbarState::default()
+            .content_length(max_scroll + 1) // +1 because we want to include the last position
+            .viewport_content_length(visible_height)
+            .position(start_idx);
+
+        frame.render_stateful_widget(
+            scrollbar,
+            area.inner(Margin {
+                vertical: 1,
+                horizontal: 0,
+            }),
+            &mut scrollbar_state,
+        );
+    }
 }
 
 fn render_normal_view(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
@@ -513,9 +667,22 @@ fn render_launcher_log(frame: &mut Frame, area: Rect, app_state: &mut AppState) 
 }
 
 fn render_game_stdout(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
+    let visible_height = area.height as usize;
+    let total_items = app_state.game_stdout.len();
+
+    // Calculate visible range to show the bottom part
+    let start_idx = if total_items <= visible_height {
+        0
+    } else {
+        total_items.saturating_sub(visible_height)
+    };
+    let end_idx = total_items;
+
     let stdouts: Vec<ListItem> = app_state
         .game_stdout
         .iter()
+        .skip(start_idx)
+        .take(end_idx - start_idx)
         .map(|i| {
             let content = Line::from(Span::raw(i.to_string()));
             ListItem::new(content)
@@ -537,12 +704,49 @@ fn render_game_stdout(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
 
     let stdout = List::new(stdouts).block(block);
     frame.render_stateful_widget(stdout, area, &mut app_state.stdout_state);
+
+    // Add scrollbar if there's more content than can be displayed
+    if total_items > visible_height {
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .symbols(scrollbar::VERTICAL)
+            .begin_symbol(None)
+            .track_symbol(None)
+            .end_symbol(None);
+
+        let max_scroll = total_items.saturating_sub(visible_height);
+        let mut scrollbar_state = ScrollbarState::default()
+            .content_length(max_scroll + 1)
+            .viewport_content_length(visible_height)
+            .position(start_idx);
+
+        frame.render_stateful_widget(
+            scrollbar,
+            area.inner(Margin {
+                vertical: 1,
+                horizontal: 0,
+            }),
+            &mut scrollbar_state,
+        );
+    }
 }
 
 fn render_game_stderr(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
+    let visible_height = area.height as usize;
+    let total_items = app_state.game_stderr.len();
+
+    // Calculate visible range to show the bottom part
+    let start_idx = if total_items <= visible_height {
+        0
+    } else {
+        total_items.saturating_sub(visible_height)
+    };
+    let end_idx = total_items;
+
     let stderrs: Vec<ListItem> = app_state
         .game_stderr
         .iter()
+        .skip(start_idx)
+        .take(end_idx - start_idx)
         .map(|i| {
             let content = Line::from(Span::raw(i.to_string()));
             ListItem::new(content)
@@ -564,6 +768,30 @@ fn render_game_stderr(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
 
     let stderr = List::new(stderrs).block(block);
     frame.render_stateful_widget(stderr, area, &mut app_state.stderr_state);
+
+    // Add scrollbar if there's more content than can be displayed
+    if total_items > visible_height {
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .symbols(scrollbar::VERTICAL)
+            .begin_symbol(None)
+            .track_symbol(None)
+            .end_symbol(None);
+
+        let max_scroll = total_items.saturating_sub(visible_height);
+        let mut scrollbar_state = ScrollbarState::default()
+            .content_length(max_scroll + 1)
+            .viewport_content_length(visible_height)
+            .position(start_idx);
+
+        frame.render_stateful_widget(
+            scrollbar,
+            area.inner(Margin {
+                vertical: 1,
+                horizontal: 0,
+            }),
+            &mut scrollbar_state,
+        );
+    }
 }
 
 fn render_exit_popup(frame: &mut Frame, area: Rect, app_state: &AppState) {

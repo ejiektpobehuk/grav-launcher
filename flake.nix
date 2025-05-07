@@ -23,6 +23,8 @@
             # System libraries
             udev # Provides libudev for controller support
             pkg-config # Required for finding libudev
+            # Release tooling
+            patchelf
           ];
 
           # Set up environment variables for pkg-config

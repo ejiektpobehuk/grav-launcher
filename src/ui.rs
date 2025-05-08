@@ -161,6 +161,18 @@ impl AppState {
         }
     }
 
+    pub const fn scroll_to_top(&mut self) {
+        match self.focused_log {
+            FocusedLog::GameStdout => {
+                self.stdout_scroll = 0;
+            }
+            FocusedLog::GameStderr => {
+                self.stderr_scroll = 0;
+            }
+            _ => {}
+        }
+    }
+
     pub fn scroll_down(&mut self) {
         match self.focused_log {
             FocusedLog::GameStdout => {
@@ -174,6 +186,20 @@ impl AppState {
                 if self.stderr_scroll < max_scroll {
                     self.stderr_scroll = self.stderr_scroll.saturating_add(1);
                 }
+            }
+            _ => {}
+        }
+    }
+
+    pub fn scroll_to_bottom(&mut self) {
+        match self.focused_log {
+            FocusedLog::GameStdout => {
+                let max_scroll = self.game_stdout.len().saturating_sub(1);
+                self.stdout_scroll = max_scroll
+            }
+            FocusedLog::GameStderr => {
+                let max_scroll = self.game_stderr.len().saturating_sub(1);
+                self.stderr_scroll = max_scroll
             }
             _ => {}
         }

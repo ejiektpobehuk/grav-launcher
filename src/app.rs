@@ -147,11 +147,18 @@ fn handle_controller_input(
                 app_state.scroll_down();
             }
             // Shoulder buttons for log navigation in fullscreen mode
-            Button::LeftTrigger | Button::LeftTrigger2 => {
+            Button::LeftTrigger => {
                 app_state.prev_log();
             }
-            Button::RightTrigger | Button::RightTrigger2 => {
+            Button::RightTrigger => {
                 app_state.next_log();
+            }
+            // Triggers for scrolling to the max
+            Button::LeftTrigger2 => {
+                app_state.scroll_to_top();
+            }
+            Button::RightTrigger2 => {
+                app_state.scroll_to_bottom();
             }
             _ => {}
         }
@@ -183,10 +190,10 @@ fn handle_controller_input(
                 app_state.prev_log();
             }
             // Shoulder buttons for log navigation
-            Button::LeftTrigger | Button::LeftTrigger2 => {
+            Button::LeftTrigger => {
                 app_state.prev_log();
             }
-            Button::RightTrigger | Button::RightTrigger2 => {
+            Button::RightTrigger => {
                 app_state.next_log();
             }
             _ => {}

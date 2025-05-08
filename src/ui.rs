@@ -827,7 +827,7 @@ fn render_game_stderr(frame: &mut Frame, area: Rect, app_state: &mut AppState) {
 }
 
 fn render_exit_popup(frame: &mut Frame, area: Rect, app_state: &AppState) {
-    let popup_area = centered_rect(46, 12, area);
+    let popup_area = centered_rect(area);
 
     // Controls text to display in the popup
     let controls_text = match app_state.input_method {
@@ -856,37 +856,51 @@ fn render_exit_popup(frame: &mut Frame, area: Rect, app_state: &AppState) {
         .border_type(BorderType::Rounded)
         .title_bottom(controls_text.right_aligned());
 
-    let popup_text = Paragraph::new(vec![
-        Line::from(""),
-        Line::from("Are you sure you want to exit?"),
-        Line::from(""),
-    ])
-    .block(popup_block)
-    .alignment(Alignment::Center)
-    .style(Style::default());
+    let popup_text = Paragraph::new("Are you sure you want to exit?")
+        .alignment(Alignment::Center)
+        .style(Style::default());
+
+    // Create a layout to vertically center the text
+    let inner_area = popup_area.inner(Margin {
+        vertical: 1,
+        horizontal: 1,
+    });
+    let text_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(0),
+            Constraint::Length(1),
+            Constraint::Min(0),
+        ])
+        .split(inner_area);
 
     // Render the popup
     frame.render_widget(Clear, popup_area);
-    frame.render_widget(popup_text, popup_area);
+    frame.render_widget(popup_block, popup_area);
+    frame.render_widget(popup_text, text_layout[1]);
 }
 
 // Helper function to create a centered rectangle of the given size
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+fn centered_rect(r: Rect) -> Rect {
+    // Minimum dimensions to ensure popup content is visible
+    const MIN_WIDTH: u16 = 34;
+    const MIN_HEIGHT: u16 = 5;
+
     let popup_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Min(0),
+            Constraint::Length(MIN_HEIGHT),
+            Constraint::Min(0),
         ])
         .split(r);
 
     Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Min(0),
+            Constraint::Length(MIN_WIDTH),
+            Constraint::Min(0),
         ])
         .split(popup_layout[1])[1]
 }

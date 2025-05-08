@@ -195,11 +195,11 @@ impl AppState {
         match self.focused_log {
             FocusedLog::GameStdout => {
                 let max_scroll = self.game_stdout.len().saturating_sub(1);
-                self.stdout_scroll = max_scroll
+                self.stdout_scroll = max_scroll;
             }
             FocusedLog::GameStderr => {
                 let max_scroll = self.game_stderr.len().saturating_sub(1);
-                self.stderr_scroll = max_scroll
+                self.stderr_scroll = max_scroll;
             }
             _ => {}
         }

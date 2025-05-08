@@ -183,18 +183,11 @@ fn handle_controller_input(
                 }
             }
             // D-pad navigation
-            Button::DPadRight | Button::DPadDown => {
+            Button::DPadRight | Button::DPadDown | Button::RightTrigger => {
                 app_state.next_log();
             }
-            Button::DPadLeft | Button::DPadUp => {
+            Button::DPadLeft | Button::DPadUp | Button::LeftTrigger => {
                 app_state.prev_log();
-            }
-            // Shoulder buttons for log navigation
-            Button::LeftTrigger => {
-                app_state.prev_log();
-            }
-            Button::RightTrigger => {
-                app_state.next_log();
             }
             _ => {}
         }

@@ -1,4 +1,7 @@
-use std::io;
+use std::env;
+use std::io::{self, IsTerminal};
+use std::path::PathBuf;
+use std::process::{Command, exit};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -23,6 +26,11 @@ static BASE_URL: &str = "https://grav.arigven.games/builds/GRAV.x86_64";
 static VERSION: &str = env!("CARGO_PKG_VERSION");
 static REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 
+struct TerminalConfig {
+    name: &'static str,
+    exec_flag: &'static str,
+}
+
 fn enable_focus_reporting() -> Result<()> {
     // Enable focus event reporting in terminal
     execute!(io::stdout(), terminal_event::EnableFocusChange)?;
@@ -35,8 +43,101 @@ fn disable_focus_reporting() -> Result<()> {
     Ok(())
 }
 
+fn get_executable_path() -> Option<PathBuf> {
+    env::current_exe().ok()
+}
+
+fn find_terminal_emulator() -> Option<TerminalConfig> {
+    // Prioritize common terminal emulators with their exec flags
+    // Different terminals use different flags to execute commands
+    let terminal_configs = [
+        TerminalConfig {
+            name: "konsole",
+            exec_flag: "-e",
+        },
+        TerminalConfig {
+            name: "gnome-terminal",
+            exec_flag: "--",
+        },
+        TerminalConfig {
+            name: "xfce4-terminal",
+            exec_flag: "-e",
+        },
+        TerminalConfig {
+            name: "kitty",
+            exec_flag: "-e",
+        },
+        TerminalConfig {
+            name: "alacritty",
+            exec_flag: "-e",
+        },
+        TerminalConfig {
+            name: "xterm",
+            exec_flag: "-e",
+        },
+    ];
+
+    for config in &terminal_configs {
+        if Command::new("which")
+            .arg(config.name)
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false)
+        {
+            return Some(TerminalConfig {
+                name: config.name,
+                exec_flag: config.exec_flag,
+            });
+        }
+    }
+
+    None
+}
+
+fn relaunch_in_terminal() -> Result<()> {
+    // Get the path to the current executable
+    let executable_path = match get_executable_path() {
+        Some(path) => path,
+        None => {
+            eprintln!("Failed to determine executable path");
+            exit(1);
+        }
+    };
+
+    // Find a suitable terminal emulator
+    let terminal_config = match find_terminal_emulator() {
+        Some(config) => config,
+        None => {
+            eprintln!("No suitable terminal emulator found");
+            exit(1);
+        }
+    };
+
+    // Launch the terminal with the application
+    Command::new(terminal_config.name)
+        .arg(terminal_config.exec_flag)
+        .arg(executable_path)
+        .spawn()
+        .map_err(|e| eyre::eyre!("Failed to launch terminal: {}", e))?;
+
+    // Exit the current process since we've spawned a new one
+    exit(0);
+}
+
 fn main() -> Result<()> {
     color_eyre::install()?;
+
+    // Check if --no-terminal flag is provided
+    let args: Vec<String> = env::args().collect();
+    let skip_terminal_check = args.iter().any(|arg| arg == "--no-terminal");
+
+    // Check if running in terminal
+    if !skip_terminal_check && !io::stdout().is_terminal() {
+        println!("Not running in a terminal, relaunching...");
+        relaunch_in_terminal()?;
+        return Ok(());
+    }
+
     let mut terminal = ratatui::init();
     let (tx, rx) = mpsc::channel();
 

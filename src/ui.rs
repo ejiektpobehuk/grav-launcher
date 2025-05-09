@@ -322,7 +322,7 @@ fn get_help_text(app_state: &AppState) -> Vec<Span> {
                 controls.push(Span::raw(" Navigate |"));
 
                 controls.push(Span::styled(" A", Style::default().fg(Color::Green).bold()));
-                controls.push(Span::raw(" Fullscreen | "));
+                controls.push(Span::raw(" Open a Log | "));
                 controls.push(Span::styled("B", Style::default().fg(Color::Red).bold()));
                 controls.push(Span::raw(" Exit "));
 
@@ -353,7 +353,7 @@ fn get_help_text(app_state: &AppState) -> Vec<Span> {
                     " Enter",
                     Style::default().fg(Color::Blue).bold(),
                 ));
-                controls.push(Span::raw(" Fullscreen | "));
+                controls.push(Span::raw(" Open a Log | "));
                 controls.push(Span::styled("Esc", Style::default().fg(Color::Blue).bold()));
                 controls.push(Span::raw(" Exit "));
 
